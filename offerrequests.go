@@ -103,6 +103,6 @@ func (o OfferRequestInput) Encode(q url.Values) error {
 }
 
 func (o PartialOfferRequestInput) Encode(q url.Values) error {
-	q["selected_partial_offer"] = o.SelectedPartialOffers
+	q["selected_partial_offer[]"] = o.SelectedPartialOffers
 	return nil
 }
