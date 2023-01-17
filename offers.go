@@ -30,7 +30,7 @@ type (
 		CreatedAt                             time.Time               `json:"created_at"`
 		UpdatedAt                             time.Time               `json:"updated_at"`
 		ExpiresAt                             time.Time               `json:"expires_at"`
-		TotalEmissionsKg                      interface{}             `json:"total_emissions_kg"`
+		TotalEmissionsKg                      float64                 `json:"total_emissions_kg"`
 		RawTotalCurrency                      string                  `json:"total_currency"`
 		RawTotalAmount                        string                  `json:"total_amount"`
 		RawTaxAmount                          string                  `json:"tax_amount"`
