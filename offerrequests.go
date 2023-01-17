@@ -14,9 +14,9 @@ import (
 type (
 	OfferRequestClient interface {
 		CreateOfferRequest(ctx context.Context, requestInput OfferRequestInput) (*OfferRequest, error)
-	GetOfferRequest(ctx context.Context, id string) (*OfferRequest, error)
+		GetOfferRequest(ctx context.Context, id string) (*OfferRequest, error)
 		CreatePartialOfferRequest(ctx context.Context, requestInput OfferRequestInput) (*OfferRequest, error)
-   GetPartialOfferRequest(ctx context.Context, requestInput PartialOfferRequestInput) (*OfferRequest, error) 
+		GetPartialOfferRequest(ctx context.Context, requestInput PartialOfferRequestInput) (*OfferRequest, error)
 		ListOfferRequests(ctx context.Context) *Iter[OfferRequest]
 	}
 
@@ -64,7 +64,7 @@ type (
 
 	PartialOfferRequestInput struct {
 		PartialOfferRequestID string
-	  SelectedPartialOffers []string
+		SelectedPartialOffers []string
 	}
 )
 
