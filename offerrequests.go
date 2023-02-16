@@ -16,7 +16,8 @@ type (
 		CreateOfferRequest(ctx context.Context, requestInput OfferRequestInput) (*OfferRequest, error)
 		GetOfferRequest(ctx context.Context, id string) (*OfferRequest, error)
 		CreatePartialOfferRequest(ctx context.Context, requestInput OfferRequestInput) (*OfferRequest, error)
-		GetPartialOfferRequest(ctx context.Context, requestInput PartialOfferRequestInput) (*OfferRequest, error)
+		GetFullPartialOfferRequest(ctx context.Context, requestInput PartialOfferRequestInput) (*OfferRequest, error)
+		GetPartialOfferRequests(ctx context.Context, requestInput PartialOfferRequestInput) (*OfferRequest, error)
 		ListOfferRequests(ctx context.Context) *Iter[OfferRequest]
 	}
 
@@ -81,9 +82,16 @@ func (a *API) CreatePartialOfferRequest(ctx context.Context, requestInput OfferR
 		Single(ctx)
 }
 
-func (a *API) GetPartialOfferRequest(ctx context.Context, requestInput PartialOfferRequestInput) (*OfferRequest, error) {
+func (a *API) GetPartialOfferRequests(ctx context.Context, requestInput PartialOfferRequestInput) (*OfferRequest, error) {
 	return newRequestWithAPI[PartialOfferRequestInput, OfferRequest](a).
 		Getf("/air/partial_offer_requests/%s", requestInput.PartialOfferRequestID).
+		WithParams(requestInput).
+		Single(ctx)
+}
+
+func (a *API) GetFullPartialOfferRequest(ctx context.Context, requestInput PartialOfferRequestInput) (*OfferRequest, error) {
+	return newRequestWithAPI[PartialOfferRequestInput, OfferRequest](a).
+		Getf("/air/partial_offer_requests/%s/fares", requestInput.PartialOfferRequestID).
 		WithParams(requestInput).
 		Single(ctx)
 }
