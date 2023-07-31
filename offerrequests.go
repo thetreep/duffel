@@ -27,7 +27,7 @@ type (
 		// The slices that make up this offer request. One-way journeys can be expressed using one slice, whereas return trips will need two.
 		Slices []OfferRequestSlice `json:"slices" url:"-"`
 		// The cabin that the passengers want to travel in
-		CabinClass CabinClass `json:"cabin_class" url:"-"`
+		CabinClass CabinClass `json:"cabin_class,omitempty" url:"-"`
 		// The maximum number of connections within any slice of the offer. For example 0 means a direct flight which will have a single segment within each slice and 1 means a maximum of two segments within each slice of the offer.
 		MaxConnections *int `json:"max_connections,omitempty" url:"-"`
 		// When set to true, the offer request resource returned will include all the offers returned by the airlines
