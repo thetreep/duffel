@@ -32,7 +32,7 @@ type (
 		MaxConnections *int `json:"max_connections,omitempty" url:"-"`
 		// When set to true, the offer request resource returned will include all the offers returned by the airlines
 		// The private fares codes of airline.  The key is the airline's IATA code that provided the private fare code.
-		PrivateFares map[string]PrivateFare `json:"private_fares,omitempty" url:"-"`
+		PrivateFares map[string][]PrivateFare `json:"private_fares,omitempty" url:"-"`
 
 		ReturnOffers bool `json:"-" url:"return_offers"`
 		// The maximum amount of time in milliseconds to wait for each airline to respond
