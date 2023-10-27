@@ -58,6 +58,7 @@ type (
 		GivenName                string                    `json:"given_name,omitempty"`
 		Age                      int                       `json:"age,omitempty"`
 		LoyaltyProgrammeAccounts []LoyaltyProgrammeAccount `json:"loyalty_programme_accounts,omitempty"`
+		FareType                 FareType                  `json:"fare_type,omitempty"`
 		// deprecated
 		Type PassengerType `json:"type,omitempty"`
 	}

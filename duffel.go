@@ -227,6 +227,8 @@ type (
 
 	PassengerTitle string
 
+	FareType string
+
 	CabinClass string
 
 	PaymentMethod string
@@ -268,6 +270,25 @@ const (
 	PassengerTypeChild PassengerType = "child"
 	// deprecated
 	PassengerTypeInfantWithoutSeat PassengerType = "infant_without_seat"
+
+	AccompanyingAdult             FareType = "accompanying_adult"
+	ContractBulk                  FareType = "contract_bulk"
+	ContractBulkChild             FareType = "contract_bulk_child"
+	ContractBulkInfantWithSeat    FareType = "contract_bulk_infant_with_seat"
+	ContractBulkInfantWithoutSeat FareType = "contract_bulk_infant_without_seat"
+	FrequentFlyer                 FareType = "frequent_flyer"
+	GroupInclusiveTour            FareType = "group_inclusive_tour"
+	GroupInclusiveTourChild       FareType = "group_inclusive_tour_child"
+	Humanitarian                  FareType = "humanitarian"
+	IndividualInclusiveTourChild  FareType = "individual_inclusive_tour_child"
+	Marine                        FareType = "marine"
+	SeatOnly                      FareType = "seat_only"
+	Student                       FareType = "student"
+	Teacher                       FareType = "teacher"
+	TourOperatorInclusive         FareType = "tour_operator_inclusive"
+	TourOperatorInclusiveInfant   FareType = "tour_operator_inclusive_infant"
+	UnaccompaniedChild            FareType = "unaccompanied_child"
+	VisitingFriendsAndFamily      FareType = "visiting_friends_and_family"
 
 	CabinClassEconomy  CabinClass = "economy"
 	CabinClassPremium  CabinClass = "premium_economy"
