@@ -31,6 +31,9 @@ type (
 		// The maximum number of connections within any slice of the offer. For example 0 means a direct flight which will have a single segment within each slice and 1 means a maximum of two segments within each slice of the offer.
 		MaxConnections *int `json:"max_connections,omitempty" url:"-"`
 		// When set to true, the offer request resource returned will include all the offers returned by the airlines
+		// The private fares codes of airline.  The key is the airline's IATA code that provided the private fare code.
+		PrivateFares map[string]PrivateFare `json:"private_fares,omitempty" url:"-"`
+
 		ReturnOffers bool `json:"-" url:"return_offers"`
 		// The maximum amount of time in milliseconds to wait for each airline to respond
 		SupplierTimeout int `json:"-" url:"supplier_timeout,omitempty"`
@@ -40,6 +43,13 @@ type (
 		DepartureDate Date   `json:"departure_date"`
 		Destination   string `json:"destination"`
 		Origin        string `json:"origin"`
+	}
+
+	// The corporate_code and tour_code are provided to you by the airline and the tracking_reference is to identify your business by the airlines.
+	PrivateFare struct {
+		CorporateCode     string `json:"corporate_code,omitempty"`
+		TrackingReference string `json:"tracking_reference,omitempty"`
+		TourCode          string `json:"tour_code,omitempty"`
 	}
 
 	OfferRequestPassenger struct {
