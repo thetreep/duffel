@@ -19,26 +19,30 @@ type (
 	ListOrdersSort string
 
 	Order struct {
-		ID               string           `json:"id"`
-		LiveMode         bool             `json:"live_mode"`
-		Metadata         Metadata         `json:"metadata"`
-		RawBaseAmount    *string          `json:"base_amount,omitempty"`
-		RawBaseCurrency  *string          `json:"base_currency,omitempty"`
-		BookingReference string           `json:"booking_reference"`
-		CancelledAt      *time.Time       `json:"cancelled_at,omitempty"`
-		CreatedAt        time.Time        `json:"created_at"`
-		Conditions       Conditions       `json:"conditions,omitempty"`
-		Documents        []Document       `json:"documents,omitempty"`
-		Owner            Airline          `json:"owner"`
-		Passengers       []OrderPassenger `json:"passengers,omitempty"`
-		PaymentStatus    PaymentStatus    `json:"payment_status"`
-		Services         []Service        `json:"services,omitempty"`
-		Slices           []Slice          `json:"slices,omitempty"`
-		SyncedAt         time.Time        `json:"synced_at"`
-		RawTaxAmount     *string          `json:"tax_amount,omitempty"`
-		RawTaxCurrency   *string          `json:"tax_currency,omitempty"`
-		RawTotalAmount   string           `json:"total_amount"`
-		RawTotalCurrency string           `json:"total_currency"`
+		ID                      string                      `json:"id"`
+		LiveMode                bool                        `json:"live_mode"`
+		Metadata                Metadata                    `json:"metadata"`
+		RawBaseAmount           *string                     `json:"base_amount,omitempty"`
+		RawBaseCurrency         *string                     `json:"base_currency,omitempty"`
+		BookingReference        string                      `json:"booking_reference"`
+		CancelledAt             *time.Time                  `json:"cancelled_at,omitempty"`
+		CreatedAt               time.Time                   `json:"created_at"`
+		Conditions              Conditions                  `json:"conditions,omitempty"`
+		Documents               []IssuedDocument            `json:"documents,omitempty"`
+		Owner                   Airline                     `json:"owner"`
+		Passengers              []OrderPassenger            `json:"passengers,omitempty"`
+		PaymentStatus           PaymentStatus               `json:"payment_status"`
+		Services                []Service                   `json:"services,omitempty"`
+		Slices                  []Slice                     `json:"slices,omitempty"`
+		SyncedAt                time.Time                   `json:"synced_at"`
+		RawTaxAmount            *string                     `json:"tax_amount,omitempty"`
+		RawTaxCurrency          *string                     `json:"tax_currency,omitempty"`
+		RawTotalAmount          string                      `json:"total_amount"`
+		RawTotalCurrency        string                      `json:"total_currency"`
+		AirlineInitiatedChanges []AirlineInitiatedChanges   `json:"airline_initiated_changes"`
+		Cancellation            *OrderCancellation          `json:"cancellation,omitempty"`
+		Changes                 []PassengerInitiatedChanges `json:"changes"`
+		// TODO: Users // preview
 	}
 
 	SliceConditions struct {
@@ -56,9 +60,10 @@ type (
 		RawPenaltyCurrency *string `json:"penalty_currency,omitempty"`
 	}
 
-	Document struct {
-		Type             string `json:"type"`
-		UniqueIdentifier string `json:"unique_identifier"`
+	IssuedDocument struct {
+		PassengerIDs     []string           `json:"passenger_ids"`
+		Type             IssuedDocumentType `json:"type"`
+		UniqueIdentifier string             `json:"unique_identifier"`
 	}
 
 	// NOTE: If you receive a 500 Internal Server Error when trying to create an order,
@@ -66,6 +71,8 @@ type (
 	// Please contact Duffel support before trying the request again.
 
 	OrderType string
+
+	IssuedDocumentType string
 
 	CreateOrderInput struct {
 		Type OrderType `json:"type"`
@@ -180,6 +187,43 @@ type (
 		After  *time.Time `url:"after,omitempty"`
 	}
 
+	PassengerInitiatedChanges struct {
+		ID                     string              `json:"id"`
+		RawChangeTotalAmount   string              `json:"change_total_amount"`
+		RawChangeTotalCurrency string              `json:"change_total_currency"`
+		ConfirmedAt            time.Time           `json:"confirmed_at"`
+		CreatedAt              time.Time           `json:"created_at"`
+		ExpiresAt              time.Time           `json:"expires_at"`
+		LiveMode               bool                `json:"live_mode"`
+		RawNewTotalAmount      string              `json:"new_total_amount"`
+		RawNewTotalCurrency    string              `json:"new_total_currency"`
+		OrderID                string              `json:"order_id"`
+		RawPenaltyAmount       string              `json:"penalty_total_amount"`
+		RawPenaltyCurrency     string              `json:"penalty_total_currency"`
+		RefundTo               RefundPaymentMethod `json:"refund_to"`
+		Slices                 struct {
+			Added   []Slice `json:"added"`
+			Removed []Slice `json:"removed"`
+		} `json:"slices"`
+	}
+
+	AirlineInitiatedChanges struct {
+		ID               string                `json:"id"`
+		ActionTaken      ActionTakenType       `json:"actions_taken"`
+		ActionTakenAt    time.Time             `json:"actions_taken_at"`
+		Added            []Slice               `json:"added"`
+		AvailableActions []AvailableActionType `json:"available_actions"`
+		CreatedAt        time.Time             `json:"created_at"`
+		OrderID          string                `json:"order_id"`
+		Removed          []Slice               `json:"removed"`
+		// TODO: TravelAgentTicket // preview
+		UpdatedAt time.Time `json:"updated_at"`
+	}
+
+	ActionTakenType string
+
+	AvailableActionType string
+
 	OrderClient interface {
 		// Get a single order by ID.
 		GetOrder(ctx context.Context, id string) (*Order, error)
@@ -201,6 +245,18 @@ const (
 
 	OrderTypeHold    OrderType = "hold"
 	OrderTypeInstant OrderType = "instant"
+
+	ActionTakenTypeAccepted  = ActionTakenType("accepted")
+	ActionTakenTypeCancelled = ActionTakenType("cancelled")
+	ActionTakenTypeChanged   = ActionTakenType("changed")
+
+	AvailableActionTypeAccept = AvailableActionType("accept")
+	AvailableActionTypeCancel = AvailableActionType("cancel")
+	AvailableActionTypeChange = AvailableActionType("change")
+
+	IssuedDocumentTypeElectronicTicket                 = IssuedDocumentType("electronic_ticket")
+	IssuedDocumentTypeElectronicMiscDocumentAssociated = IssuedDocumentType("electronic_miscellaneous_document_associated")
+	IssuedDocumentTypeElectronicMiscDocumentStandalone = IssuedDocumentType("electronic_miscellaneous_document_standalone")
 )
 
 // CreateOrder creates a new order.

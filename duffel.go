@@ -233,6 +233,8 @@ type (
 
 	PaymentMethod string
 
+	RefundPaymentMethod string
+
 	// Offers is slice of offers that implement the sort.Sort interface
 	// By default, offers are sorted cheapest first.
 	Offers []Offer
@@ -309,11 +311,14 @@ const (
 	Voucher               PaymentMethod = "voucher"
 	AwaitingPayment       PaymentMethod = "awaiting_payment"
 	OriginalFormOfPayment PaymentMethod = "original_form_of_payment"
+
+	RefundPaymentMethodVoucher               RefundPaymentMethod = "voucher"
+	RefundPaymentMethodOriginalFormOfPayment RefundPaymentMethod = "original_form_of_payment"
 )
 
 func New(apiToken string, opts ...Option) Duffel {
 	options := &Options{
-		Version:   "v1",
+		Version:   "v2",
 		UserAgent: userAgentString,
 		Host:      defaultHost,
 		HttpDoer:  http.DefaultClient,

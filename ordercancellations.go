@@ -15,15 +15,6 @@ import (
 const orderCancellationIDPrefix = "ore_"
 
 type (
-	// OrderCancellationRequest is response from the OrderCancellation API.
-	//
-	// Once you've created a pending order cancellation, you'll know
-	// the `refund_amount` you're due to get back.
-	//
-	// To actually cancel the order, you'll need to confirm the cancellation.
-	// The booking with the airline will be cancelled, and the `refund_amount` will be
-	// returned to the original payment method (i.e. your Duffel balance).
-	// You'll then need to refund your customer (e.g. back to their credit/debit card).
 	OrderCancellation struct {
 		ID                string        `json:"id"`
 		OrderID           string        `json:"order_id"`
@@ -36,11 +27,19 @@ type (
 		LiveMode          bool          `json:"live_mode"`
 	}
 
+	// OrderCancellationRequest is response from the OrderCancellation API.
+	//
+	// Once you've created a pending order cancellation, you'll know
+	// the `refund_amount` you're due to get back.
+	//
+	// To actually cancel the order, you'll need to confirm the cancellation.
+	// The booking with the airline will be cancelled, and the `refund_amount` will be
+	// returned to the original payment method (i.e. your Duffel balance).
+	// You'll then need to refund your customer (e.g. back to their credit/debit card).
 	OrderCancellationRequest struct {
 		OrderID string `json:"order_id"`
 	}
 
-	// OrderCancellationClient
 	OrderCancellationClient interface {
 		CreateOrderCancellation(ctx context.Context, orderID string) (*OrderCancellation, error)
 		ConfirmOrderCancellation(ctx context.Context, orderCancellationID string) (*OrderCancellation, error)
@@ -50,15 +49,19 @@ type (
 
 func (a *API) CreateOrderCancellation(ctx context.Context, orderID string) (*OrderCancellation, error) {
 	return newRequestWithAPI[OrderCancellationRequest, OrderCancellation](a).
-		Post("/air/order_cancellations", &OrderCancellationRequest{
-			OrderID: orderID,
-		}).
+		Post(
+			"/air/order_cancellations", &OrderCancellationRequest{
+				OrderID: orderID,
+			},
+		).
 		Single(ctx)
 }
 
 func (a *API) ConfirmOrderCancellation(ctx context.Context, orderCancellationID string) (*OrderCancellation, error) {
 	if !strings.HasPrefix(orderCancellationID, orderCancellationIDPrefix) {
-		return nil, fmt.Errorf("orderCancellationID should have prefix %s, got %s", orderCancellationIDPrefix, orderCancellationID[:4])
+		return nil, fmt.Errorf(
+			"orderCancellationID should have prefix %s, got %s", orderCancellationIDPrefix, orderCancellationID[:4],
+		)
 	}
 
 	return newRequestWithAPI[EmptyPayload, OrderCancellation](a).
@@ -68,7 +71,9 @@ func (a *API) ConfirmOrderCancellation(ctx context.Context, orderCancellationID 
 
 func (a *API) GetOrderCancellation(ctx context.Context, orderCancellationID string) (*OrderCancellation, error) {
 	if !strings.HasPrefix(orderCancellationID, orderCancellationIDPrefix) {
-		return nil, fmt.Errorf("orderCancellationID should have prefix %s, got %s", orderCancellationIDPrefix, orderCancellationID[:4])
+		return nil, fmt.Errorf(
+			"orderCancellationID should have prefix %s, got %s", orderCancellationIDPrefix, orderCancellationID[:4],
+		)
 	}
 
 	return newRequestWithAPI[EmptyPayload, OrderCancellation](a).

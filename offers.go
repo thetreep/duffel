@@ -19,35 +19,51 @@ const offerRequestIDPrefix = "orq_"
 
 type (
 	OfferClient interface {
-		UpdateOfferPassenger(ctx context.Context, offerRequestID, passengerID string, input PassengerUpdateInput) (*OfferRequestPassenger, error)
+		UpdateOfferPassenger(
+			ctx context.Context, offerRequestID, passengerID string, input PassengerUpdateInput,
+		) (*OfferRequestPassenger, error)
 		ListOffers(ctx context.Context, reqId string, options ...ListOffersParams) *Iter[Offer]
 		GetOffer(ctx context.Context, id string, params ...GetOfferParams) (*Offer, error)
 	}
 
 	Offer struct {
-		ID                                    string                  `json:"id"`
-		LiveMode                              bool                    `json:"live_mode"`
-		CreatedAt                             time.Time               `json:"created_at"`
-		UpdatedAt                             time.Time               `json:"updated_at"`
-		ExpiresAt                             time.Time               `json:"expires_at"`
-		TotalEmissionsKg                      interface{}             `json:"total_emissions_kg"`
-		RawTotalCurrency                      string                  `json:"total_currency"`
-		RawTotalAmount                        string                  `json:"total_amount"`
-		RawTaxAmount                          string                  `json:"tax_amount"`
-		RawTaxCurrency                        string                  `json:"tax_currency"`
-		RawBaseAmount                         string                  `json:"base_amount"`
-		RawBaseCurrency                       string                  `json:"base_currency"`
-		Owner                                 Airline                 `json:"owner"`
-		Slices                                []Slice                 `json:"slices"`
-		Passengers                            []OfferRequestPassenger `json:"passengers"`
-		Partial                               bool                    `json:"partial"`
-		PassengerIdentityDocumentsRequired    bool                    `json:"passenger_identity_documents_required"`
-		AllowedPassengerIdentityDocumentTypes []string                `json:"allowed_passenger_identity_document_types"`
-		PaymentRequirements                   OfferPaymentRequirement `json:"payment_requirements"`
-		AvailableServices                     []AvailableService      `json:"available_services"`
-		Conditions                            Conditions              `json:"conditions"`
+		ID                                      string                  `json:"id"`
+		LiveMode                                bool                    `json:"live_mode"`
+		CreatedAt                               time.Time               `json:"created_at"`
+		UpdatedAt                               time.Time               `json:"updated_at"`
+		ExpiresAt                               time.Time               `json:"expires_at"`
+		TotalEmissionsKg                        interface{}             `json:"total_emissions_kg"`
+		RawTotalCurrency                        string                  `json:"total_currency"`
+		RawTotalAmount                          string                  `json:"total_amount"`
+		RawTaxAmount                            string                  `json:"tax_amount"`
+		RawTaxCurrency                          string                  `json:"tax_currency"`
+		RawBaseAmount                           string                  `json:"base_amount"`
+		RawBaseCurrency                         string                  `json:"base_currency"`
+		Owner                                   Airline                 `json:"owner"`
+		Slices                                  []Slice                 `json:"slices"`
+		Passengers                              []OfferRequestPassenger `json:"passengers"`
+		Partial                                 bool                    `json:"partial"`
+		PassengerIdentityDocumentsRequired      bool                    `json:"passenger_identity_documents_required"`
+		SupportedPassengerIdentityDocumentTypes []string                `json:"supported_passenger_identity_document_types"` // e.g. ["passport"]
+		PaymentRequirements                     OfferPaymentRequirement `json:"payment_requirements"`
+		AvailableServices                       []AvailableService      `json:"available_services"`
+		Conditions                              Conditions              `json:"conditions"`
+		PrivateFares                            []OfferPrivateFare      `json:"private_fares"`
+		SupportedLoyaltyProgrammes              []string                `json:"supported_loyalty_programmes"` // Airline IATA codes (e.g. ["BA", "U2"])
 	}
 
+	PrivateFareType string
+
+	OfferPrivateFare struct {
+		CorporateCode     string          `json:"corporate_code,omitempty"`
+		TrackingReference string          `json:"tracking_reference,omitempty"`
+		TourCode          string          `json:"tour_code,omitempty"`
+		Type              PrivateFareType `json:"type,omitempty"`
+	}
+
+	ServiceType string
+
+	// AvailableService is only returned on the "Get Single Offer" endpoint (GetOffer in this SDK)
 	AvailableService struct {
 		// Duffel's unique identifier for service
 		ID               string                   `json:"id"`
@@ -58,18 +74,34 @@ type (
 		RawTotalAmount   string                   `json:"total_amount"`
 		RawTotalCurrency string                   `json:"total_currency"`
 
-		// Possible values: "baggage"
+		// Possible values: "baggage", "seat", "meal", or "cancel_for_any_reason"
 		Type string `json:"type"`
 	}
 
 	AvailableServiceMetadata struct {
-		MaximumDepthCM  int `json:"maximum_depth_cm,omitempty"`
-		MaximumHeightCM int `json:"maximum_height_cm,omitempty"`
-		MaximumLengthCM int `json:"maximum_length_cm,omitempty"`
-		MaximumWeightKg int `json:"maximum_weight_kg,omitempty"`
+		// For a Baggage
+		MaximumDepthCM  int `json:"maximum_depth_cm,omitempty"`  // e.g. 30
+		MaximumHeightCM int `json:"maximum_height_cm,omitempty"` // e.g. 40
+		MaximumLengthCM int `json:"maximum_length_cm,omitempty"` // e.g. 55
+		MaximumWeightKg int `json:"maximum_weight_kg,omitempty"` // e.g. 23
 		// Possible values: "checked", "carry_on"
 		Type string `json:"type"`
+
+		// For a Seat
+		Designator  string   `json:"designator,omitempty"`  // e.g. "14B"
+		Disclosures []string `json:"disclosures,omitempty"` // e.g. ["Do not seat children in exit row seats"]
+		Name        string   `json:"name,omitempty"`        // e.g. "Exit row seat"
+
+		// For a Meal
+		Meal MealType `json:"meal,omitempty"` // e.g. "vegetarian_meal"
+
+		// For Cancel for Any Reason
+		MerchantCopy          string `json:"merchant_copy,omitempty"`            // e.g. "If you purchase this product we can refund up to 75% of your base fare if you cancel 24 hours before your first scheduled departure\n"
+		RawRefundAmount       string `json:"refund_amount,omitempty"`            // e.g. "100.00"
+		TermsAndConditionsURL string `json:"terms_and_conditions_url,omitempty"` // e.g. "https://example.com/terms-and-conditions"
 	}
+
+	MealType string
 
 	OfferPaymentRequirement struct {
 		RequiresInstantPayment  bool      `json:"requires_instant_payment"`
@@ -92,10 +124,44 @@ type (
 const (
 	ListOffersSortTotalAmount   ListOffersSortParam = "total_amount"
 	ListOffersSortTotalDuration ListOffersSortParam = "total_duration"
+
+	ServiceTypeBaggage = ServiceType("baggage")
+	ServiceTypeSeat    = ServiceType("seat")
+	ServiceTypeMeal    = ServiceType("meal")
+	ServiceTypeCancel  = ServiceType("cancel_for_any_reason")
+
+	PrivateFareTypeCorporate  PrivateFareType = "corporate"
+	PrivateFareTypeLeisure    PrivateFareType = "leisure"
+	PrivateFareTypeNegotiated PrivateFareType = "negotiated"
+
+	MealTypeBabyMeal               MealType = "baby_meal"
+	MealTypeBlandMeal              MealType = "bland_meal"
+	MealTypeAsianVegetarianMeal    MealType = "asian_vegetarian_meal"
+	MealTypeDiabeticMeal           MealType = "diabetic_meal"
+	MealTypeGlutenFreeMeal         MealType = "gluten_free_meal"
+	MealTypeHinduMeal              MealType = "hindu_meal"
+	MealTypeKosherMeal             MealType = "kosher_meal"
+	MealTypeMuslimMeal             MealType = "muslim_meal"
+	MealTypeVeganMeal              MealType = "vegan_meal"
+	MealTypeVegetarianLactoOvoMeal MealType = "vegetarian_lacto_ovo_meal"
+	MealTypeTraditionalMeal        MealType = "traditional_meal"
+	MealTypeLowFatMeal             MealType = "low_fat_meal"
+	MealTypeLowSaltMeal            MealType = "low_salt_meal"
+	MealTypeLactoseFreeMeal        MealType = "lactose_free_meal"
+	MealTypeHealthyMeal            MealType = "healthy_meal"
+	MealTypeSwissColdMeal          MealType = "swiss_cold_meal"
+	MealTypeSwissBrunch            MealType = "swiss_brunch"
+	MealTypeJapaneseMeal           MealType = "japanese_meal"
+	MealTypeChildMeal              MealType = "child_meal"
+	MealTypeAllergenMeal           MealType = "allergen_meal"
+	MealTypeVegetarianMeal         MealType = "vegetarian_meal"
+	MealTypeMeal                   MealType = "meal"
 )
 
 // UpdateOfferPassenger updates a single offer passenger.
-func (a *API) UpdateOfferPassenger(ctx context.Context, offerRequestID, passengerID string, input PassengerUpdateInput) (*OfferRequestPassenger, error) {
+func (a *API) UpdateOfferPassenger(
+	ctx context.Context, offerRequestID, passengerID string, input PassengerUpdateInput,
+) (*OfferRequestPassenger, error) {
 	url := fmt.Sprintf("/air/offers/%s/passengers/%s", offerRequestID, passengerID)
 	return newRequestWithAPI[PassengerUpdateInput, OfferRequestPassenger](a).Patch(url, &input).Single(ctx)
 }
