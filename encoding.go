@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/segmentio/encoding/json"
+
 	"github.com/thetreep/duffel/iso8601"
 )
 
@@ -49,6 +50,10 @@ func (t *Date) UnmarshalJSON(b []byte) error {
 	}
 	*t = Date(stamp)
 	return nil
+}
+
+func (t Date) Format(f string) string {
+	return time.Time(t).Format(f)
 }
 
 func (t DateTime) MarshalJSON() ([]byte, error) {
@@ -91,6 +96,10 @@ func (t *DateTime) UnmarshalJSON(b []byte) error {
 
 	*t = DateTime(stamp)
 	return nil
+}
+
+func (t *DateTime) Format(f string) string {
+	return time.Time(*t).Format(f)
 }
 
 func (t Duration) MarshalJSON() ([]byte, error) {
