@@ -291,7 +291,7 @@ func (a *API) UpdateOrder(ctx context.Context, id string, params OrderUpdatePara
 	return newRequestWithAPI[OrderUpdateParams, Order](a).Patch("/air/orders/"+id, &params).Single(ctx)
 }
 
-// CreateOrder creates a new order.
+// GetOrder returns a single order by ID.
 func (a *API) GetOrder(ctx context.Context, id string) (*Order, error) {
 	return newRequestWithAPI[EmptyPayload, Order](a).Get("/air/orders/" + id).Single(ctx)
 }
