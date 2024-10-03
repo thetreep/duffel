@@ -42,7 +42,10 @@ type (
 		AirlineInitiatedChanges []AirlineInitiatedChanges   `json:"airline_initiated_changes"`
 		Cancellation            *OrderCancellation          `json:"cancellation,omitempty"`
 		Changes                 []PassengerInitiatedChanges `json:"changes"`
-		// TODO: Users // preview
+		Content                 OrderContent                `json:"content"`
+		OfferID                 string                      `json:"offer_id"`
+		Type                    OrderType                   `json:"type"`
+		// TODO: Users // preview - slice of string ids representing users allowed to manage this order
 	}
 
 	SliceConditions struct {
@@ -74,6 +77,8 @@ type (
 
 	IssuedDocumentType string
 
+	OrderContent string
+
 	CreateOrderInput struct {
 		Type OrderType `json:"type"`
 
@@ -94,6 +99,14 @@ type (
 		SelectedOffers []string `json:"selected_offers"`
 
 		Services []ServiceCreateInput `json:"services,omitempty"`
+	}
+
+	AddOrderServiceInput struct {
+		// The services you want to add to the order.
+		AddServices []ServiceCreateInput `json:"add_services"`
+
+		// The payment details to pay for the services.
+		Payment PaymentCreateInput `json:"payment"`
 	}
 
 	// The services you want to book along with the first selected offer. This key should be omitted when the order’s type is hold, as we do not support services for hold orders yet.
@@ -236,6 +249,12 @@ type (
 
 		// Create an order.
 		CreateOrder(ctx context.Context, input CreateOrderInput) (*Order, error)
+
+		// List available services for an order.
+		ListOrderServices(ctx context.Context, id string) ([]*AvailableService, error)
+
+		// Add a service to an order.
+		AddOrderService(ctx context.Context, id string, input AddOrderServiceInput) (*Order, error)
 	}
 )
 
@@ -257,6 +276,9 @@ const (
 	IssuedDocumentTypeElectronicTicket                 = IssuedDocumentType("electronic_ticket")
 	IssuedDocumentTypeElectronicMiscDocumentAssociated = IssuedDocumentType("electronic_miscellaneous_document_associated")
 	IssuedDocumentTypeElectronicMiscDocumentStandalone = IssuedDocumentType("electronic_miscellaneous_document_standalone")
+
+	OrderContentManaged     = OrderContent("managed")
+	OrderContentSelfManaged = OrderContent("self_managed")
 )
 
 // CreateOrder creates a new order.
@@ -278,6 +300,17 @@ func (a *API) ListOrders(ctx context.Context, params ...ListOrdersParams) *Iter[
 		Get("/air/orders").
 		WithParams(normalizeParams(params)...).
 		Iter(ctx)
+}
+
+func (a *API) ListOrderServices(ctx context.Context, id string) ([]*AvailableService, error) {
+	return newRequestWithAPI[EmptyPayload, AvailableService](a).
+		Get("/air/orders/" + id + "/available_services").Slice(ctx)
+}
+
+func (a *API) AddOrderService(ctx context.Context, id string, input AddOrderServiceInput) (*Order, error) {
+	return newRequestWithAPI[AddOrderServiceInput, Order](a).
+		Post("/air/orders/"+id+"/services", &input).
+		Single(ctx)
 }
 
 func (o *Order) BaseAmount() *currency.Amount {

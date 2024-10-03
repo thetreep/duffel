@@ -33,13 +33,15 @@ type (
 
 	Gender string
 
+	LocationType string
+
 	BaseSlice struct {
-		OriginType      string    `json:"origin_type"`
-		Origin          Location  `json:"origin"`
-		DestinationType string    `json:"destination_type"`
-		Destination     Location  `json:"destination"`
-		DepartureDate   Date      `json:"departure_date,omitempty"`
-		CreatedAt       time.Time `json:"created_at,omitempty"`
+		OriginType      LocationType `json:"origin_type"`
+		Origin          Location     `json:"origin"`
+		DestinationType LocationType `json:"destination_type"`
+		Destination     Location     `json:"destination"`
+		DepartureDate   Date         `json:"departure_date,omitempty"`
+		CreatedAt       time.Time    `json:"created_at,omitempty"`
 	}
 
 	// TODO: We probably need an OfferRequestSlice and an OrderSlice since not all fields apply to both.
@@ -67,12 +69,22 @@ type (
 		MarketingCarrierFlightNumber string             `json:"marketing_carrier_flight_number"`
 		MarketingCarrier             Airline            `json:"marketing_carrier"`
 		Duration                     Duration           `json:"duration"`
-		Distance                     Distance           `json:"distance,omitempty"`
-		DestinationTerminal          string             `json:"destination_terminal"`
-		Destination                  Location           `json:"destination"`
-		RawDepartingAt               string             `json:"departing_at"`
-		RawArrivingAt                string             `json:"arriving_at"`
-		Aircraft                     Aircraft           `json:"aircraft"`
+		// Distance is the distance in km
+		Distance            Distance `json:"distance,omitempty"`
+		DestinationTerminal string   `json:"destination_terminal"`
+		Destination         Location `json:"destination"`
+		RawDepartingAt      string   `json:"departing_at"`
+		RawArrivingAt       string   `json:"arriving_at"`
+		Aircraft            Aircraft `json:"aircraft"`
+		Stops               []Stop   `json:"stops"`
+	}
+
+	Stop struct {
+		Airport     Location `json:"airport"`
+		ArrivingAt  string   `json:"arriving_at"`
+		DepartingAt string   `json:"departing_at"`
+		Duration    Duration `json:"duration"`
+		ID          string   `json:"id"`
 	}
 
 	SegmentPassenger struct {
@@ -202,6 +214,7 @@ type (
 		AwaitingPayment         bool       `json:"awaiting_payment"`
 		PaymentRequiredBy       *time.Time `json:"payment_required_by,omitempty"`
 		PriceGuaranteeExpiresAt *time.Time `json:"price_guarantee_expires_at,omitempty"`
+		PaidAt                  *time.Time `json:"paid_at,omitempty"`
 	}
 
 	LoyaltyProgrammeAccount struct {
@@ -314,6 +327,9 @@ const (
 
 	RefundPaymentMethodVoucher               RefundPaymentMethod = "voucher"
 	RefundPaymentMethodOriginalFormOfPayment RefundPaymentMethod = "original_form_of_payment"
+
+	LocationTypeAirport LocationType = "airport"
+	LocationTypeCity    LocationType = "city"
 )
 
 func New(apiToken string, opts ...Option) Duffel {
