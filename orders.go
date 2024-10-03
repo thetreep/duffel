@@ -286,6 +286,7 @@ func (a *API) CreateOrder(ctx context.Context, input CreateOrderInput) (*Order, 
 	return newRequestWithAPI[CreateOrderInput, Order](a).Post("/air/orders", &input).Single(ctx)
 }
 
+// UpdateOrder updates an existing order with update-able fields (mostly metadata).
 func (a *API) UpdateOrder(ctx context.Context, id string, params OrderUpdateParams) (*Order, error) {
 	return newRequestWithAPI[OrderUpdateParams, Order](a).Patch("/air/orders/"+id, &params).Single(ctx)
 }
@@ -295,6 +296,7 @@ func (a *API) GetOrder(ctx context.Context, id string) (*Order, error) {
 	return newRequestWithAPI[EmptyPayload, Order](a).Get("/air/orders/" + id).Single(ctx)
 }
 
+// ListOrders returns a list of orders.
 func (a *API) ListOrders(ctx context.Context, params ...ListOrdersParams) *Iter[Order] {
 	return newRequestWithAPI[ListOrdersParams, Order](a).
 		Get("/air/orders").
@@ -302,11 +304,13 @@ func (a *API) ListOrders(ctx context.Context, params ...ListOrdersParams) *Iter[
 		Iter(ctx)
 }
 
+// ListOrderServices returns a list of available services for an order.
 func (a *API) ListOrderServices(ctx context.Context, id string) ([]*AvailableService, error) {
 	return newRequestWithAPI[EmptyPayload, AvailableService](a).
 		Get("/air/orders/" + id + "/available_services").Slice(ctx)
 }
 
+// AddOrderService adds a service to an order.
 func (a *API) AddOrderService(ctx context.Context, id string, input AddOrderServiceInput) (*Order, error) {
 	return newRequestWithAPI[AddOrderServiceInput, Order](a).
 		Post("/air/orders/"+id+"/services", &input).
