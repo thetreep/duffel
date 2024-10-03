@@ -47,9 +47,10 @@ type (
 
 	// The corporate_code and tour_code are provided to you by the airline and the tracking_reference is to identify your business by the airlines.
 	PrivateFare struct {
-		CorporateCode     string `json:"corporate_code,omitempty"`
-		TrackingReference string `json:"tracking_reference,omitempty"`
-		TourCode          string `json:"tour_code,omitempty"`
+		CorporateCode     string          `json:"corporate_code,omitempty"`
+		TrackingReference string          `json:"tracking_reference,omitempty"`
+		TourCode          string          `json:"tour_code,omitempty"`
+		Type              PrivateFareType `json:"type,omitempty"`
 	}
 
 	OfferRequestPassenger struct {

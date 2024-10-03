@@ -89,32 +89,33 @@ type (
 		// You should not store sensitive information in this field.
 		Metadata Metadata `json:"metadata,omitempty"`
 
-		// The personal details of the passengers, expanding on
+		// Passengers The personal details of the passengers, expanding on
 		// the information initially provided when creating the offer request.
 		Passengers []OrderPassenger `json:"passengers"`
 
 		Payments []PaymentCreateInput `json:"payments,omitempty"`
 
-		// The ids of the offers you want to book. You must specify an array containing exactly one selected offer.
+		// SelectedOffers The ids of the offers you want to book. You must specify an array containing exactly one selected offer.
 		SelectedOffers []string `json:"selected_offers"`
 
 		Services []ServiceCreateInput `json:"services,omitempty"`
 	}
 
 	AddOrderServiceInput struct {
-		// The services you want to add to the order.
+		// AddServices The services you want to add to the order.
 		AddServices []ServiceCreateInput `json:"add_services"`
 
-		// The payment details to pay for the services.
+		// Payment The payment details to pay for the services.
 		Payment PaymentCreateInput `json:"payment"`
 	}
 
-	// The services you want to book along with the first selected offer. This key should be omitted when the order’s type is hold, as we do not support services for hold orders yet.
+	// ServiceCreateInput The services you want to book along with the first selected offer.
+	// This key should be omitted when the order’s type is hold, as we do not support services for hold orders yet.
 	ServiceCreateInput struct {
-		// The id of the service from the offer's available_services that you want to book
+		// ID The id of the service from the offer's available_services that you want to book
 		ID string `json:"id"`
 
-		// The quantity of the service to book. This will always be 1 for seat services.
+		// Quantity The quantity of the service to book. This will always be 1 for seat services.
 		Quantity int `json:"quantity"`
 	}
 
@@ -122,7 +123,7 @@ type (
 		// Duffel's unique identifier for the booked service
 		ID string `json:"id"`
 
-		// The metadata varies by the type of service.
+		// Metadata The metadata varies by the type of service.
 		// It includes further data about the service. For example, for
 		// baggages, it may have data about size and weight restrictions.
 		Metadata Metadata `json:"metadata"`
@@ -131,17 +132,18 @@ type (
 		// The service applies to all the passengers in this list.
 		PassengerIDs []string `json:"passenger_ids"`
 
-		// The quantity of the service that was booked
+		// Quantity The quantity of the service that was booked
 		Quantity int `json:"quantity"`
 
 		// List of segment ids the service applies to. The service applies to all the segments in this list.
 		SegmentIDs []string `json:"segment_ids"`
 
-		// The total price of the service for all passengers and segments it applies to, accounting for quantity and including taxes
+		// RawTotalAmount The total price of the service for all passengers and segments it applies to,
+		// accounting for quantity and including taxes
 		RawTotalAmount   string `json:"total_amount,omitempty"`
 		RawTotalCurrency string `json:"total_currency,omitempty"`
 
-		// Possible values: "baggage" or "seat"
+		// Type Possible values: "baggage" or "seat"
 		Type string `json:"type"`
 	}
 
@@ -189,7 +191,7 @@ type (
 		CreatedAt *TimeFilter `url:"created_at,omitempty"`
 
 		// Orders will be included if any of their passengers matches any of the given names.
-		// Matches are case insensitive, and include partial matches.
+		// Matches are case-insensitive, and include partial matches.
 		PassengerNames []string `url:"passenger_name,omitempty"`
 	}
 
@@ -237,24 +239,45 @@ type (
 
 	AvailableActionType string
 
+	UpdateAirlineInitiatedChangeInput struct {
+		ActionTaken ActionTakenType `json:"action_taken"`
+	}
+
+	ListAirlineInitiatedChangesParams struct {
+		OrderID string `url:"order_id,omitempty"`
+	}
+
 	OrderClient interface {
-		// Get a single order by ID.
+		// GetOrder Get a single order by ID.
 		GetOrder(ctx context.Context, id string) (*Order, error)
 
-		// Update a single order by ID.
+		// UpdateOrder Update a single order by ID.
 		UpdateOrder(ctx context.Context, id string, params OrderUpdateParams) (*Order, error)
 
-		// List orders.
+		// ListOrders List orders.
 		ListOrders(ctx context.Context, params ...ListOrdersParams) *Iter[Order]
 
-		// Create an order.
+		// CreateOrder Create an order.
 		CreateOrder(ctx context.Context, input CreateOrderInput) (*Order, error)
 
-		// List available services for an order.
+		// ListOrderServices List available services for an order.
 		ListOrderServices(ctx context.Context, id string) ([]*AvailableService, error)
 
-		// Add a service to an order.
+		// AddOrderService Add a service to an order.
 		AddOrderService(ctx context.Context, id string, input AddOrderServiceInput) (*Order, error)
+
+		// UpdateAirlineInitiatedChange Update an airline-initiated change.
+		UpdateAirlineInitiatedChange(ctx context.Context, id string, input UpdateAirlineInitiatedChangeInput) (
+			*Order, error,
+		)
+
+		// AcceptAirlineInitiatedChange Accept an airline-initiated change.
+		AcceptAirlineInitiatedChange(ctx context.Context, id string) (*Order, error)
+
+		// ListAirlineInitiatedChanges List airline-initiated changes.
+		ListAirlineInitiatedChanges(
+			ctx context.Context, params ...ListAirlineInitiatedChangesParams,
+		) *Iter[AirlineInitiatedChanges]
 	}
 )
 
@@ -317,6 +340,32 @@ func (a *API) AddOrderService(ctx context.Context, id string, input AddOrderServ
 		Single(ctx)
 }
 
+// UpdateAirlineInitiatedChange updates an airline-initiated change.
+func (a *API) UpdateAirlineInitiatedChange(
+	ctx context.Context, id string, input UpdateAirlineInitiatedChangeInput,
+) (*Order, error) {
+	return newRequestWithAPI[UpdateAirlineInitiatedChangeInput, Order](a).
+		Patch("/air/airline_initiated_changes/"+id, &input).
+		Single(ctx)
+}
+
+// AcceptAirlineInitiatedChange accepts an airline-initiated change.
+func (a *API) AcceptAirlineInitiatedChange(ctx context.Context, id string) (*Order, error) {
+	return newRequestWithAPI[EmptyPayload, Order](a).
+		Post("/air/airline_initiated_changes/"+id+"/actions/accept", nil).
+		Single(ctx)
+}
+
+// ListAirlineInitiatedChanges returns a list of airline-initiated changes.
+func (a *API) ListAirlineInitiatedChanges(
+	ctx context.Context, params ...ListAirlineInitiatedChangesParams,
+) *Iter[AirlineInitiatedChanges] {
+	return newRequestWithAPI[ListAirlineInitiatedChangesParams, AirlineInitiatedChanges](a).
+		Get("/air/airline_initiated_changes").
+		WithParams(normalizeParams(params)...).
+		Iter(ctx)
+}
+
 func (o *Order) BaseAmount() *currency.Amount {
 	if o.RawBaseAmount != nil && o.RawBaseCurrency != nil {
 		amount, err := currency.NewAmount(*o.RawBaseAmount, *o.RawBaseCurrency)
@@ -371,4 +420,12 @@ func (o ListOrdersParams) Encode(q url.Values) error {
 	enc := schema.NewEncoder()
 	enc.SetAliasTag("url")
 	return enc.Encode(o, q)
+}
+
+func (l ListAirlineInitiatedChangesParams) Encode(q url.Values) error {
+	if l.OrderID != "" {
+		q.Add("order_id", l.OrderID)
+	}
+
+	return nil
 }
