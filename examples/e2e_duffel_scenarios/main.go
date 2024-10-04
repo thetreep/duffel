@@ -21,7 +21,7 @@ func main() {
 	client := duffel.New(token)
 	ctx := context.Background()
 
-	cardsAPIClient := duffel.New(token, duffel.WithHost("https://api.duffel.cards"), duffel.WithDebug())
+	// cardsAPIClient := duffel.New(token, duffel.WithHost("https://api.duffel.cards"), duffel.WithDebug())
 
 	// Offer Request Tests
 	testNoFlights(ctx, client)
