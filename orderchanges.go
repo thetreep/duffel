@@ -142,6 +142,7 @@ func (a *API) GetOrderChangeRequest(ctx context.Context, orderChangeRequestID st
 	if err := validateID(orderChangeRequestID, orderChangeRequestIDPrefix); err != nil {
 		return nil, err
 	}
+
 	return newRequestWithAPI[EmptyPayload, OrderChangeRequest](a).
 		Getf("/air/order_change_requests/%s", orderChangeRequestID).
 		Single(ctx)
@@ -152,6 +153,7 @@ func (a *API) CreatePendingOrderChange(ctx context.Context, offerID string) (*Or
 	if err := validateID(offerID, orderChangeOfferIDPrefix); err != nil {
 		return nil, err
 	}
+
 	return newRequestWithAPI[map[string]string, OrderChange](a).
 		Postf("/air/order_changes").
 		Body(&map[string]string{"selected_order_change_offer": offerID}).
@@ -165,6 +167,7 @@ func (a *API) ConfirmOrderChange(
 	if err := validateID(orderChangeRequestID, orderChangeRequestIDPrefix); err != nil {
 		return nil, err
 	}
+
 	return newRequestWithAPI[PaymentCreateInput, OrderChange](a).
 		Postf("/air/order_changes/%s/actions/confirm", orderChangeRequestID).
 		Body(&payment).
@@ -176,6 +179,7 @@ func (a *API) GetOrderChange(ctx context.Context, id string) (*OrderChange, erro
 	if err := validateID(id, orderChangeIDPrefix); err != nil {
 		return nil, err
 	}
+
 	return newRequestWithAPI[EmptyPayload, OrderChange](a).
 		Getf("/air/order_changes/%s", id).
 		Single(ctx)
@@ -186,6 +190,7 @@ func (a *API) GetOrderChangeOffer(ctx context.Context, id string) (*OrderChangeO
 	if err := validateID(id, orderChangeOfferIDPrefix); err != nil {
 		return nil, err
 	}
+
 	return newRequestWithAPI[EmptyPayload, OrderChangeOffer](a).
 		Getf("/air/order_change_offers/%s", id).
 		Single(ctx)
@@ -209,6 +214,7 @@ func validateID(id, prefix string) error {
 	} else if !strings.HasPrefix(id, prefix) {
 		return fmt.Errorf("id should begin with %s", prefix)
 	}
+
 	return nil
 }
 
@@ -217,6 +223,7 @@ func (o *OrderChangeOffer) ChangeTotalAmount() currency.Amount {
 	if err != nil {
 		return currency.Amount{}
 	}
+
 	return amount
 }
 
@@ -225,6 +232,7 @@ func (o *OrderChangeOffer) NewTotalAmount() currency.Amount {
 	if err != nil {
 		return currency.Amount{}
 	}
+
 	return amount
 }
 
@@ -234,6 +242,7 @@ func (o *OrderChangeOffer) PenaltyTotalAmount() currency.Amount {
 	if err != nil {
 		return currency.Amount{}
 	}
+
 	return amount
 }
 

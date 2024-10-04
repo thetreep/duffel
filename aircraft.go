@@ -16,7 +16,7 @@ type (
 )
 
 func (a *API) ListAircraft(ctx context.Context) *Iter[Aircraft] {
-	return newRequestWithAPI[ListAirportsParams, Aircraft](a).
+	return newRequestWithAPI[EmptyPayload, Aircraft](a).
 		Get("/air/aircraft").
 		Iter(ctx)
 }

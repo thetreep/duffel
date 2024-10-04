@@ -27,6 +27,8 @@ type (
 		AirlinesClient
 		AircraftClient
 		PlacesClient
+		PaymentCardClient
+		LoyaltyProgrammeClient
 
 		LastRequestID() (string, bool)
 	}
@@ -181,9 +183,7 @@ type (
 		LoyaltyProgrammeAccounts []LoyaltyProgrammeAccount `json:"loyalty_programme_accounts,omitempty"`
 		// (Required) The passenger's phone number in E.164 (international) format
 		PhoneNumber string `json:"phone_number"`
-
-		// Type is the type of passenger. This field is deprecated.
-		// @Deprecated
+		// Type is the type of passenger.
 		// Possible values: "adult", "child", or "infant_without_seat"
 		Type PassengerType `json:"type"`
 	}
@@ -279,11 +279,8 @@ type (
 )
 
 const (
-	// deprecated
-	PassengerTypeAdult PassengerType = "adult"
-	// deprecated
-	PassengerTypeChild PassengerType = "child"
-	// deprecated
+	PassengerTypeAdult             PassengerType = "adult"
+	PassengerTypeChild             PassengerType = "child"
 	PassengerTypeInfantWithoutSeat PassengerType = "infant_without_seat"
 
 	AccompanyingAdult             FareType = "accompanying_adult"

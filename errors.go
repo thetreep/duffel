@@ -151,6 +151,14 @@ type DuffelError struct {
 }
 
 func (e *DuffelError) Error() string {
+	if e == nil {
+		return ""
+	}
+
+	if len(e.Errors) == 0 {
+		return fmt.Sprintf("duffel: unknown error")
+	}
+
 	return fmt.Sprintf("duffel: %s", e.Errors[0].Message)
 }
 

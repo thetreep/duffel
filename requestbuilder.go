@@ -134,6 +134,17 @@ func (r *RequestBuilder[Req, Resp]) Getf(path string, a ...any) *RequestBuilder[
 	return r.Get(fmt.Sprintf(path, a...))
 }
 
+func (r *RequestBuilder[Req, Resp]) Delete(path string, opts ...RequestOption) *RequestBuilder[Req, Resp] {
+	r.method = http.MethodDelete
+	r.resourcePath = path
+	r.requestOptions = append(r.requestOptions, opts...)
+	return r
+}
+
+func (r *RequestBuilder[Req, Resp]) Deletef(path string, a ...any) *RequestBuilder[Req, Resp] {
+	return r.Delete(fmt.Sprintf(path, a...))
+}
+
 // Post sets the request method to POST, the request path to the given path, and the request payload to body. Global request options are applied.
 func (r *RequestBuilder[Req, Resp]) Post(path string, body *Req, opts ...RequestOption) *RequestBuilder[Req, Resp] {
 	r.method = http.MethodPost
@@ -165,27 +176,29 @@ func (r *RequestBuilder[Req, Resp]) Patch(path string, body *Req, opts ...Reques
 
 // Iter finalizes the request and returns an iterator over the response.
 func (r *RequestBuilder[Req, Resp]) Iter(ctx context.Context) *Iter[Resp] {
-	return GetIter(func(lastMeta *ListMeta) (*List[Resp], error) {
-		ctx, cancel := context.WithDeadline(ctx, time.Now().Add(90*time.Second))
-		defer cancel()
+	return GetIter(
+		func(lastMeta *ListMeta) (*List[Resp], error) {
+			ctx, cancel := context.WithDeadline(ctx, time.Now().Add(90*time.Second))
+			defer cancel()
 
-		list := new(List[Resp])
-		response, err := r.makeRequest(ctx, WithRequestPagination(lastMeta))
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to make request")
-		}
+			list := new(List[Resp])
+			response, err := r.makeRequest(ctx, WithRequestPagination(lastMeta))
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to make request")
+			}
 
-		container := new(ResponsePayload[[]*Resp])
-		err = decodeResponse(response, &container)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to decode response")
-		}
+			container := new(ResponsePayload[[]*Resp])
+			err = decodeResponse(response, &container)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to decode response")
+			}
 
-		list.SetListMeta(container.Meta)
-		list.SetItems(container.Data)
-		list.setRequestID(response.Header.Get(RequestIDHeader))
-		return list, nil
-	})
+			list.SetListMeta(container.Meta)
+			list.SetItems(container.Data)
+			list.setRequestID(response.Header.Get(RequestIDHeader))
+			return list, nil
+		},
+	)
 }
 
 // Slice finalizes the request and returns the first page of items as a slice along with the error.
@@ -224,6 +237,20 @@ func (r *RequestBuilder[Req, Resp]) Single(ctx context.Context) (*Resp, error) {
 	}
 
 	return container.Data, nil
+}
+
+// Empty finalizes the request and returns an error if the request fails.
+// It is to be used for requests that are expected to return no data.
+func (r *RequestBuilder[Req, Resp]) Empty(ctx context.Context) error {
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(90*time.Second))
+	defer cancel()
+
+	_, err := r.makeRequest(ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *RequestBuilder[Req, Resp]) makeRequest(ctx context.Context, opts ...RequestOption) (*http.Response, error) {
