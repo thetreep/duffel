@@ -27,19 +27,23 @@ type (
 		AirlinesClient
 		AircraftClient
 		PlacesClient
+		PaymentCardClient
+		LoyaltyProgrammeClient
 
 		LastRequestID() (string, bool)
 	}
 
 	Gender string
 
+	LocationType string
+
 	BaseSlice struct {
-		OriginType      string    `json:"origin_type"`
-		Origin          Location  `json:"origin"`
-		DestinationType string    `json:"destination_type"`
-		Destination     Location  `json:"destination"`
-		DepartureDate   Date      `json:"departure_date,omitempty"`
-		CreatedAt       time.Time `json:"created_at,omitempty"`
+		OriginType      LocationType `json:"origin_type"`
+		Origin          Location     `json:"origin"`
+		DestinationType LocationType `json:"destination_type"`
+		Destination     Location     `json:"destination"`
+		DepartureDate   Date         `json:"departure_date,omitempty"`
+		CreatedAt       time.Time    `json:"created_at,omitempty"`
 	}
 
 	// TODO: We probably need an OfferRequestSlice and an OrderSlice since not all fields apply to both.
@@ -67,12 +71,22 @@ type (
 		MarketingCarrierFlightNumber string             `json:"marketing_carrier_flight_number"`
 		MarketingCarrier             Airline            `json:"marketing_carrier"`
 		Duration                     Duration           `json:"duration"`
-		Distance                     Distance           `json:"distance,omitempty"`
-		DestinationTerminal          string             `json:"destination_terminal"`
-		Destination                  Location           `json:"destination"`
-		RawDepartingAt               string             `json:"departing_at"`
-		RawArrivingAt                string             `json:"arriving_at"`
-		Aircraft                     Aircraft           `json:"aircraft"`
+		// Distance is the distance in km
+		Distance            Distance `json:"distance,omitempty"`
+		DestinationTerminal string   `json:"destination_terminal"`
+		Destination         Location `json:"destination"`
+		RawDepartingAt      string   `json:"departing_at"`
+		RawArrivingAt       string   `json:"arriving_at"`
+		Aircraft            Aircraft `json:"aircraft"`
+		Stops               []Stop   `json:"stops"`
+	}
+
+	Stop struct {
+		Airport     Location `json:"airport"`
+		ArrivingAt  string   `json:"arriving_at"`
+		DepartingAt string   `json:"departing_at"`
+		Duration    Duration `json:"duration"`
+		ID          string   `json:"id"`
 	}
 
 	SegmentPassenger struct {
@@ -169,9 +183,7 @@ type (
 		LoyaltyProgrammeAccounts []LoyaltyProgrammeAccount `json:"loyalty_programme_accounts,omitempty"`
 		// (Required) The passenger's phone number in E.164 (international) format
 		PhoneNumber string `json:"phone_number"`
-
-		// Type is the type of passenger. This field is deprecated.
-		// @Deprecated
+		// Type is the type of passenger.
 		// Possible values: "adult", "child", or "infant_without_seat"
 		Type PassengerType `json:"type"`
 	}
@@ -202,6 +214,7 @@ type (
 		AwaitingPayment         bool       `json:"awaiting_payment"`
 		PaymentRequiredBy       *time.Time `json:"payment_required_by,omitempty"`
 		PriceGuaranteeExpiresAt *time.Time `json:"price_guarantee_expires_at,omitempty"`
+		PaidAt                  *time.Time `json:"paid_at,omitempty"`
 	}
 
 	LoyaltyProgrammeAccount struct {
@@ -232,6 +245,8 @@ type (
 	CabinClass string
 
 	PaymentMethod string
+
+	RefundPaymentMethod string
 
 	// Offers is slice of offers that implement the sort.Sort interface
 	// By default, offers are sorted cheapest first.
@@ -264,11 +279,8 @@ type (
 )
 
 const (
-	// deprecated
-	PassengerTypeAdult PassengerType = "adult"
-	// deprecated
-	PassengerTypeChild PassengerType = "child"
-	// deprecated
+	PassengerTypeAdult             PassengerType = "adult"
+	PassengerTypeChild             PassengerType = "child"
 	PassengerTypeInfantWithoutSeat PassengerType = "infant_without_seat"
 
 	AccompanyingAdult             FareType = "accompanying_adult"
@@ -303,17 +315,24 @@ const (
 	PassengerTitleMrs  PassengerTitle = "mrs"
 	PassengerTitleMiss PassengerTitle = "miss"
 
-	PaymentMethodBalance  PaymentMethod = "balance"
-	ARCBSPCash            PaymentMethod = "arc_bsp_cash"
-	Card                  PaymentMethod = "card"
-	Voucher               PaymentMethod = "voucher"
-	AwaitingPayment       PaymentMethod = "awaiting_payment"
-	OriginalFormOfPayment PaymentMethod = "original_form_of_payment"
+	PaymentMethodBalance               PaymentMethod = "balance"
+	PaymentMethodARCBSPCash            PaymentMethod = "arc_bsp_cash"
+	PaymentMethodCard                  PaymentMethod = "card"
+	PaymentMethodVoucher               PaymentMethod = "voucher"
+	PaymentMethodAwaitingPayment       PaymentMethod = "awaiting_payment"
+	PaymentMethodOriginalFormOfPayment PaymentMethod = "original_form_of_payment"
+	PaymentMethodAirlineCredits        PaymentMethod = "airline_credits"
+
+	RefundPaymentMethodVoucher               RefundPaymentMethod = "voucher"
+	RefundPaymentMethodOriginalFormOfPayment RefundPaymentMethod = "original_form_of_payment"
+
+	LocationTypeAirport LocationType = "airport"
+	LocationTypeCity    LocationType = "city"
 )
 
 func New(apiToken string, opts ...Option) Duffel {
 	options := &Options{
-		Version:   "v1",
+		Version:   "v2",
 		UserAgent: userAgentString,
 		Host:      defaultHost,
 		HttpDoer:  http.DefaultClient,

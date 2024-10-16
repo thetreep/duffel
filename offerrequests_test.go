@@ -29,27 +29,29 @@ func TestCreateOffersRequest(t *testing.T) {
 	ctx := context.TODO()
 
 	client := New("duffel_test_123")
-	data, err := client.CreateOfferRequest(ctx, OfferRequestInput{
-		Passengers: []OfferRequestPassenger{
-			{
-				FamilyName: "Earhardt",
-				GivenName:  "Amelia",
-				Type:       PassengerTypeAdult,
+	data, err := client.CreateOfferRequest(
+		ctx, OfferRequestInput{
+			Passengers: []OfferRequestPassenger{
+				{
+					FamilyName: "Earhardt",
+					GivenName:  "Amelia",
+					Type:       PassengerTypeAdult,
+				},
+				{
+					Age: 14,
+				},
 			},
-			{
-				Age: 14,
+			CabinClass:   CabinClassEconomy,
+			ReturnOffers: true,
+			Slices: []OfferRequestSlice{
+				{
+					DepartureDate: Date(time.Now().AddDate(0, 0, 7)),
+					Origin:        "JFK",
+					Destination:   "AUS",
+				},
 			},
 		},
-		CabinClass:   CabinClassEconomy,
-		ReturnOffers: true,
-		Slices: []OfferRequestSlice{
-			{
-				DepartureDate: Date(time.Now().AddDate(0, 0, 7)),
-				Origin:        "JFK",
-				Destination:   "AUS",
-			},
-		},
-	})
+	)
 	a.NoError(err)
 	a.NotNil(data)
 
@@ -58,7 +60,7 @@ func TestCreateOffersRequest(t *testing.T) {
 	a.Len(data.Slices, 1)
 	a.Equal("2021-12-30", data.Slices[0].DepartureDate.String())
 	a.Equal("arp_jfk_us", data.Slices[0].Origin.ID)
-	a.Equal("airport", data.Slices[0].OriginType)
+	a.Equal(LocationTypeAirport, data.Slices[0].OriginType)
 	a.Equal("2021-12-30", data.Slices[0].DepartureDate.String())
 }
 
@@ -85,7 +87,7 @@ func TestGetOfferRequest(t *testing.T) {
 	a.Equal(false, data.Offers[0].LiveMode)
 	a.Equal("137", data.Offers[0].TotalEmissionsKg)
 	a.Equal(false, data.Offers[0].PassengerIdentityDocumentsRequired)
-	a.Equal("airport", data.Offers[0].Slices[0].DestinationType)
+	a.Equal(LocationTypeAirport, data.Offers[0].Slices[0].DestinationType)
 	a.Equal(false, data.Offers[0].Slices[0].Changeable)
 	a.Equal("Refundable Main Cabin", data.Offers[0].Slices[0].FareBrandName)
 

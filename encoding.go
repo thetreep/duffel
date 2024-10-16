@@ -5,12 +5,14 @@
 package duffel
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
 	"time"
 
 	"github.com/segmentio/encoding/json"
+
 	"github.com/thetreep/duffel/iso8601"
 )
 
@@ -36,7 +38,7 @@ func (t Date) String() string {
 func (t *Date) UnmarshalJSON(b []byte) error {
 	str, err := parseJSONBytesToString(b)
 	if err != nil {
-		if err == ErrNullValue {
+		if errors.Is(err, ErrNullValue) {
 			return nil
 		}
 
@@ -49,6 +51,10 @@ func (t *Date) UnmarshalJSON(b []byte) error {
 	}
 	*t = Date(stamp)
 	return nil
+}
+
+func (t Date) Format(f string) string {
+	return time.Time(t).Format(f)
 }
 
 func (t DateTime) MarshalJSON() ([]byte, error) {
@@ -71,7 +77,7 @@ var timeFormats = []string{
 func (t *DateTime) UnmarshalJSON(b []byte) error {
 	str, err := parseJSONBytesToString(b)
 	if err != nil {
-		if err == ErrNullValue {
+		if errors.Is(err, ErrNullValue) {
 			return nil
 		}
 		return err
@@ -91,6 +97,10 @@ func (t *DateTime) UnmarshalJSON(b []byte) error {
 
 	*t = DateTime(stamp)
 	return nil
+}
+
+func (t *DateTime) Format(f string) string {
+	return time.Time(*t).Format(f)
 }
 
 func (t Duration) MarshalJSON() ([]byte, error) {
@@ -127,7 +137,7 @@ func (d Duration) MarshalGQL(w io.Writer) {
 func (t *Duration) UnmarshalJSON(b []byte) error {
 	f, err := parseJSONBytesToString(b)
 	if err != nil {
-		if err == ErrNullValue {
+		if errors.Is(err, ErrNullValue) {
 			return nil
 		}
 		return err
@@ -150,7 +160,7 @@ func (t Distance) MarshalJSON() ([]byte, error) {
 func (t *Distance) UnmarshalJSON(b []byte) error {
 	f, err := parseJSONBytesToString(b)
 	if err != nil {
-		if err == ErrNullValue {
+		if errors.Is(err, ErrNullValue) {
 			return nil
 		}
 		return err

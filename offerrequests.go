@@ -47,9 +47,10 @@ type (
 
 	// The corporate_code and tour_code are provided to you by the airline and the tracking_reference is to identify your business by the airlines.
 	PrivateFare struct {
-		CorporateCode     string `json:"corporate_code,omitempty"`
-		TrackingReference string `json:"tracking_reference,omitempty"`
-		TourCode          string `json:"tour_code,omitempty"`
+		CorporateCode     string          `json:"corporate_code,omitempty"`
+		TrackingReference string          `json:"tracking_reference,omitempty"`
+		TourCode          string          `json:"tour_code,omitempty"`
+		Type              PrivateFareType `json:"type,omitempty"`
 	}
 
 	OfferRequestPassenger struct {
@@ -59,13 +60,13 @@ type (
 		Age                      int                       `json:"age,omitempty"`
 		LoyaltyProgrammeAccounts []LoyaltyProgrammeAccount `json:"loyalty_programme_accounts,omitempty"`
 		FareType                 FareType                  `json:"fare_type,omitempty"`
-		// deprecated
-		Type PassengerType `json:"type,omitempty"`
+		Type                     PassengerType             `json:"type,omitempty"`
 	}
 
 	// OfferRequest is the response from the OfferRequest endpoint, created using the OfferRequestInput.
 	OfferRequest struct {
 		ID         string                  `json:"id"`
+		ClientKey  string                  `json:"client_key"` // For use with https://duffel.com/docs/guides/ancillaries-component
 		LiveMode   bool                    `json:"live_mode"`
 		CreatedAt  time.Time               `json:"created_at"`
 		Slices     []BaseSlice             `json:"slices"`
@@ -93,14 +94,18 @@ func (a *API) CreatePartialOfferRequest(ctx context.Context, requestInput OfferR
 		Single(ctx)
 }
 
-func (a *API) GetPartialOfferRequests(ctx context.Context, requestInput PartialOfferRequestInput) (*OfferRequest, error) {
+func (a *API) GetPartialOfferRequests(ctx context.Context, requestInput PartialOfferRequestInput) (
+	*OfferRequest, error,
+) {
 	return newRequestWithAPI[PartialOfferRequestInput, OfferRequest](a).
 		Getf("/air/partial_offer_requests/%s", requestInput.PartialOfferRequestID).
 		WithParams(requestInput).
 		Single(ctx)
 }
 
-func (a *API) GetFullPartialOfferRequest(ctx context.Context, requestInput PartialOfferRequestInput) (*OfferRequest, error) {
+func (a *API) GetFullPartialOfferRequest(ctx context.Context, requestInput PartialOfferRequestInput) (
+	*OfferRequest, error,
+) {
 	return newRequestWithAPI[PartialOfferRequestInput, OfferRequest](a).
 		Getf("/air/partial_offer_requests/%s/fares", requestInput.PartialOfferRequestID).
 		WithParams(requestInput).

@@ -5,6 +5,7 @@
 package duffel
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -19,23 +20,36 @@ type (
 	}
 )
 
+var headerTimeFormats = []string{
+	time.RFC1123,
+	"Mon, 2 Jan 2006 15:04:05 MST",
+}
+
 func parseRateLimit(resp *http.Response) (*RateLimit, error) {
 	rl := &RateLimit{}
-	var err error
 
-	rl.Limit, err = strconv.Atoi(resp.Header.Get("Ratelimit-Limit"))
+	limit, err := strconv.Atoi(resp.Header.Get("Ratelimit-Limit"))
 	if err != nil {
 		return nil, err
 	}
+	rl.Limit = limit
 
-	rl.Remaining, err = strconv.Atoi(resp.Header.Get("Ratelimit-Remaining"))
+	remaining, err := strconv.Atoi(resp.Header.Get("Ratelimit-Remaining"))
 	if err != nil {
 		return nil, err
 	}
+	rl.Remaining = remaining
 
-	resetAt, err := time.Parse(time.RFC1123, resp.Header.Get("Ratelimit-Reset"))
-	if err != nil {
-		return nil, err
+	resetHeader := resp.Header.Get("Ratelimit-Reset")
+	for _, format := range headerTimeFormats {
+		if resetAt, err := time.Parse(format, resetHeader); err == nil {
+			rl.ResetAt = resetAt
+			break
+		}
+	}
+
+	if rl.ResetAt.IsZero() {
+		return nil, fmt.Errorf("failed to parse Ratelimit-Reset header: %s, no known date formats match", resetHeader)
 	}
 
 	date, err := time.Parse(time.RFC1123, resp.Header.Get("Date"))
@@ -43,8 +57,7 @@ func parseRateLimit(resp *http.Response) (*RateLimit, error) {
 		return nil, err
 	}
 
-	rl.ResetAt = resetAt
-	rl.Period = resetAt.Sub(date)
+	rl.Period = rl.ResetAt.Sub(date)
 
 	return rl, nil
 }
