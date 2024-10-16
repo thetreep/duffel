@@ -277,7 +277,7 @@ type (
 		// ListAirlineInitiatedChanges List airline-initiated changes.
 		ListAirlineInitiatedChanges(
 			ctx context.Context, params ...ListAirlineInitiatedChangesParams,
-		) *Iter[AirlineInitiatedChanges]
+		) ([]*AirlineInitiatedChanges, error)
 	}
 )
 
@@ -359,11 +359,10 @@ func (a *API) AcceptAirlineInitiatedChange(ctx context.Context, id string) (*Ord
 // ListAirlineInitiatedChanges returns a list of airline-initiated changes.
 func (a *API) ListAirlineInitiatedChanges(
 	ctx context.Context, params ...ListAirlineInitiatedChangesParams,
-) *Iter[AirlineInitiatedChanges] {
+) ([]*AirlineInitiatedChanges, error) {
 	return newRequestWithAPI[ListAirlineInitiatedChangesParams, AirlineInitiatedChanges](a).
 		Get("/air/airline_initiated_changes").
-		WithParams(normalizeParams(params)...).
-		Iter(ctx)
+		WithParams(normalizeParams(params)...).Slice(ctx)
 }
 
 func (o *Order) BaseAmount() *currency.Amount {

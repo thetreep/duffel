@@ -13,9 +13,9 @@ type (
 		AddressPostalCode  string `json:"address_postal_code"`
 		AddressRegion      string `json:"address_region"`
 		// Deprecated: Brand is no longer required
-		Brand        PaymentCardBrand `json:"brand"`
-		ExpireMonth  string           `json:"expire_month"`
-		ExpireYear   string           `json:"expire_year"`
+		Brand        PaymentCardBrand `json:"brand,omitempty"`
+		ExpiryMonth  string           `json:"expiry_month"`
+		ExpiryYear   string           `json:"expiry_year"`
 		Name         string           `json:"name"`
 		Number       string           `json:"number"`
 		SecurityCode string           `json:"cvc"`

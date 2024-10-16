@@ -5,6 +5,7 @@
 package duffel
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -37,7 +38,7 @@ func (t Date) String() string {
 func (t *Date) UnmarshalJSON(b []byte) error {
 	str, err := parseJSONBytesToString(b)
 	if err != nil {
-		if err == ErrNullValue {
+		if errors.Is(err, ErrNullValue) {
 			return nil
 		}
 
@@ -76,7 +77,7 @@ var timeFormats = []string{
 func (t *DateTime) UnmarshalJSON(b []byte) error {
 	str, err := parseJSONBytesToString(b)
 	if err != nil {
-		if err == ErrNullValue {
+		if errors.Is(err, ErrNullValue) {
 			return nil
 		}
 		return err
@@ -136,7 +137,7 @@ func (d Duration) MarshalGQL(w io.Writer) {
 func (t *Duration) UnmarshalJSON(b []byte) error {
 	f, err := parseJSONBytesToString(b)
 	if err != nil {
-		if err == ErrNullValue {
+		if errors.Is(err, ErrNullValue) {
 			return nil
 		}
 		return err
@@ -159,7 +160,7 @@ func (t Distance) MarshalJSON() ([]byte, error) {
 func (t *Distance) UnmarshalJSON(b []byte) error {
 	f, err := parseJSONBytesToString(b)
 	if err != nil {
-		if err == ErrNullValue {
+		if errors.Is(err, ErrNullValue) {
 			return nil
 		}
 		return err
