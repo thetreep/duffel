@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/thetreep/duffel"
+	"github.com/thetreep/duffel/v2"
 )
 
 func main() {

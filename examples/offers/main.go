@@ -14,7 +14,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/urfave/cli/v2"
 
-	"github.com/thetreep/duffel"
+	"github.com/thetreep/duffel/v2"
 )
 
 func main() {
@@ -133,49 +133,62 @@ func createOfferRequest(c *cli.Context) error {
 		return err
 	}
 
-	slices = append(slices, duffel.OfferRequestSlice{
-		Origin:        origin,
-		Destination:   destination,
-		DepartureDate: duffel.Date(departureDate),
-	})
+	slices = append(
+		slices, duffel.OfferRequestSlice{
+			Origin:        origin,
+			Destination:   destination,
+			DepartureDate: duffel.Date(departureDate),
+		},
+	)
 
 	if returnDateStr != "" {
 		returnDate, err := time.Parse(duffel.DateFormat, returnDateStr)
 		if err != nil {
 			return err
 		}
-		slices = append(slices, duffel.OfferRequestSlice{
-			Origin:        destination,
-			Destination:   origin,
-			DepartureDate: duffel.Date(returnDate),
-		})
+		slices = append(
+			slices, duffel.OfferRequestSlice{
+				Origin:        destination,
+				Destination:   origin,
+				DepartureDate: duffel.Date(returnDate),
+			},
+		)
 	}
 
 	passengers := []duffel.OfferRequestPassenger{}
 	for i := 0; i < adultsCount; i++ {
-		passengers = append(passengers, duffel.OfferRequestPassenger{
-			Type: duffel.PassengerTypeAdult,
-		})
+		passengers = append(
+			passengers, duffel.OfferRequestPassenger{
+				Type: duffel.PassengerTypeAdult,
+			},
+		)
 	}
 
 	for _, age := range childAges {
-		passengers = append(passengers, duffel.OfferRequestPassenger{
-			// Type: duffel.PassengerTypeChild,
-			Age: age,
-		})
+		passengers = append(
+			passengers, duffel.OfferRequestPassenger{
+				// Type: duffel.PassengerTypeChild,
+				Age: age,
+			},
+		)
 	}
 
-	request, err := client.CreateOfferRequest(c.Context, duffel.OfferRequestInput{
-		Slices:     slices,
-		Passengers: passengers,
-	})
+	request, err := client.CreateOfferRequest(
+		c.Context, duffel.OfferRequestInput{
+			Slices:     slices,
+			Passengers: passengers,
+		},
+	)
 	if err != nil {
 		return err
 	}
 
 	log.Printf("Request ID: %s", request.ID)
 	for _, slice := range request.Slices {
-		log.Printf("Request slice: %s to %s departing on %s", slice.Origin.Name, slice.Destination.Name, slice.DepartureDate.String())
+		log.Printf(
+			"Request slice: %s to %s departing on %s", slice.Origin.Name, slice.Destination.Name,
+			slice.DepartureDate.String(),
+		)
 	}
 
 	return nil
@@ -198,7 +211,9 @@ func listOfferRequests(c *cli.Context) error {
 		fmt.Printf("===> Offer Request: %s created: %s\n", req.ID, time.Time(req.CreatedAt).Format(time.RFC3339))
 
 		for _, slice := range req.Slices {
-			fmt.Printf("   > %s to %s on %s\n", slice.Origin.IATACode, slice.Destination.IATACode, slice.DepartureDate.String())
+			fmt.Printf(
+				"   > %s to %s on %s\n", slice.Origin.IATACode, slice.Destination.IATACode, slice.DepartureDate.String(),
+			)
 		}
 	}
 
@@ -209,9 +224,11 @@ func getOfferAction(c *cli.Context) error {
 	client := duffel.New(os.Getenv("DUFFEL_TOKEN"))
 	offerID := c.Args().First()
 
-	off, err := client.GetOffer(c.Context, offerID, duffel.GetOfferParams{
-		ReturnAvailableServices: true,
-	})
+	off, err := client.GetOffer(
+		c.Context, offerID, duffel.GetOfferParams{
+			ReturnAvailableServices: true,
+		},
+	)
 	if err != nil {
 		log.Printf("OfferID: %s", offerID)
 		return err
@@ -226,7 +243,9 @@ func getOfferAction(c *cli.Context) error {
 
 	fmt.Println("Conditions:")
 	for _, slc := range off.Slices {
-		fmt.Printf("  > %s - %s %s changeable: %v\n", slc.Origin.Name, slc.Destination.Name, slc.FareBrandName, slc.Changeable)
+		fmt.Printf(
+			"  > %s - %s %s changeable: %v\n", slc.Origin.Name, slc.Destination.Name, slc.FareBrandName, slc.Changeable,
+		)
 
 		if slc.Conditions.ChangeBeforeDeparture != nil {
 			fmt.Printf("  > Change before departure: %v\n", slc.Conditions.ChangeBeforeDeparture.Allowed)
@@ -279,10 +298,12 @@ func getOfferSeatsAction(c *cli.Context) error {
 func listOffersAction(c *cli.Context) error {
 	client := duffel.New(os.Getenv("DUFFEL_TOKEN"))
 	requestID := c.Args().First()
-	iter := client.ListOffers(c.Context, requestID, duffel.ListOffersParams{
-		MaxConnections: 1,
-		Sort:           duffel.ListOffersSortTotalAmount,
-	})
+	iter := client.ListOffers(
+		c.Context, requestID, duffel.ListOffersParams{
+			MaxConnections: 1,
+			Sort:           duffel.ListOffersSortTotalAmount,
+		},
+	)
 
 	for iter.Next() {
 		offer := iter.Current()

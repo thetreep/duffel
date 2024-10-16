@@ -13,7 +13,7 @@ import (
 
 	"github.com/segmentio/encoding/json"
 
-	"github.com/thetreep/duffel/iso8601"
+	"github.com/thetreep/duffel/v2/iso8601"
 )
 
 type (

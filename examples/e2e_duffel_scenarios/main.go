@@ -10,7 +10,7 @@ import (
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 
-	"github.com/thetreep/duffel"
+	"github.com/thetreep/duffel/v2"
 )
 
 var rowConfigAutoMerge table.RowConfig
@@ -22,7 +22,7 @@ func main() {
 	}
 
 	client := duffel.New(token)
-	cardsAPIClient := duffel.New(token, duffel.WithDebug())
+	cardsAPIClient := duffel.New(token, duffel.WithDebug(), duffel.WithHost("https://api.duffel.cards/"))
 	ctx := context.Background()
 
 	t := table.NewWriter()

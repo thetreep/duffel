@@ -1,4 +1,4 @@
-module github.com/thetreep/duffel
+module github.com/thetreep/duffel/v2
 
 go 1.22.4
 

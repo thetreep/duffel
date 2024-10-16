@@ -11,15 +11,17 @@ import (
 	"log"
 	"os"
 
-	"github.com/thetreep/duffel"
+	"github.com/thetreep/duffel/v2"
 )
 
 func main() {
 	ctx := context.Background()
 	client := duffel.New(os.Getenv("DUFFEL_TOKEN"))
-	iter := client.ListAirports(ctx, duffel.ListAirportsParams{
-		// IATACountryCode: "AU",
-	})
+	iter := client.ListAirports(
+		ctx, duffel.ListAirportsParams{
+			// IATACountryCode: "AU",
+		},
+	)
 
 	cache := map[string]*duffel.Airport{}
 
