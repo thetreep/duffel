@@ -217,8 +217,8 @@ type (
 		RawPenaltyCurrency     string              `json:"penalty_total_currency"`
 		RefundTo               RefundPaymentMethod `json:"refund_to"`
 		Slices                 struct {
-			Added   []Slice `json:"add"`
-			Removed []Slice `json:"remove"`
+			Add    []Slice `json:"add"`
+			Remove []Slice `json:"remove"`
 		} `json:"slices"`
 	}
 
