@@ -6,6 +6,7 @@ package duffel
 
 import (
 	"context"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -21,6 +22,7 @@ type (
 	Order struct {
 		ID                      string                      `json:"id"`
 		LiveMode                bool                        `json:"live_mode"`
+		Message                 *string                     `json:"message,omitempty"`
 		Metadata                Metadata                    `json:"metadata"`
 		RawBaseAmount           *string                     `json:"base_amount,omitempty"`
 		RawBaseCurrency         *string                     `json:"base_currency,omitempty"`
@@ -45,6 +47,7 @@ type (
 		Content                 OrderContent                `json:"content"`
 		OfferID                 string                      `json:"offer_id"`
 		Type                    OrderType                   `json:"type"`
+		IsPendingConfirmation   bool                        `json:"-"`
 		// TODO: Users // preview - slice of string ids representing users allowed to manage this order
 	}
 
@@ -306,7 +309,16 @@ const (
 
 // CreateOrder creates a new order.
 func (a *API) CreateOrder(ctx context.Context, input CreateOrderInput) (*Order, error) {
-	return newRequestWithAPI[CreateOrderInput, Order](a).Post("/air/orders", &input).Single(ctx)
+	order, statusCode, err := newRequestWithAPI[CreateOrderInput, Order](a).Post(
+		"/air/orders", &input,
+	).SingleWithResponse(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if statusCode == http.StatusAccepted {
+		order.IsPendingConfirmation = true
+	}
+	return order, nil
 }
 
 // UpdateOrder updates an existing order with update-able fields (mostly metadata).

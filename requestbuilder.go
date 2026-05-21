@@ -223,20 +223,26 @@ func (r *RequestBuilder[Req, Resp]) Slice(ctx context.Context) ([]*Resp, error) 
 
 // Single finalizes the request and returns a single item response.
 func (r *RequestBuilder[Req, Resp]) Single(ctx context.Context) (*Resp, error) {
+	data, _, err := r.SingleWithResponse(ctx)
+	return data, err
+}
+
+// SingleWithResponse finalizes the request and returns the decoded response along with the HTTP status code.
+func (r *RequestBuilder[Req, Resp]) SingleWithResponse(ctx context.Context) (*Resp, int, error) {
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(90*time.Second))
 	defer cancel()
 
 	response, err := r.makeRequest(ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	container := new(ResponsePayload[*Resp])
 	err = decodeResponse(response, &container)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode response")
+		return nil, 0, errors.Wrap(err, "failed to decode response")
 	}
 
-	return container.Data, nil
+	return container.Data, response.StatusCode, nil
 }
 
 // Empty finalizes the request and returns an error if the request fails.
