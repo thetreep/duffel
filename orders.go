@@ -48,6 +48,7 @@ type (
 		OfferID                 string                      `json:"offer_id"`
 		Type                    OrderType                   `json:"type"`
 		IsPendingConfirmation   bool                        `json:"-"`
+		IsAwaitingCreation      bool                        `json:"-"`
 		// TODO: Users // preview - slice of string ids representing users allowed to manage this order
 	}
 
@@ -315,8 +316,11 @@ func (a *API) CreateOrder(ctx context.Context, input CreateOrderInput) (*Order, 
 	if err != nil {
 		return nil, err
 	}
-	if statusCode == http.StatusAccepted {
+	switch statusCode {
+	case http.StatusAccepted:
 		order.IsPendingConfirmation = true
+	case http.StatusOK:
+		order.IsAwaitingCreation = true
 	}
 	return order, nil
 }

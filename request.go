@@ -7,6 +7,7 @@ package duffel
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -29,7 +30,9 @@ func newInternalClient[Req any, Resp any](a *API) *client[Req, Resp] {
 	return client
 }
 
-func (c *client[Req, Resp]) Do(ctx context.Context, resourceName string, method string, body *Req, opts ...RequestOption) (*http.Response, error) {
+func (c *client[Req, Resp]) Do(
+	ctx context.Context, resourceName string, method string, body *Req, opts ...RequestOption,
+) (*http.Response, error) {
 	payload, err := encodePayload(body)
 	if err != nil {
 		return nil, err
@@ -58,8 +61,24 @@ func (c *client[Req, Resp]) Do(ctx context.Context, resourceName string, method 
 	c.limiter.SetBurst(rateLimit.Limit)
 	c.limiter.SetLimit(rate.Every(rateLimit.Period))
 
-	if rateLimit.Remaining == 0 || resp.StatusCode == http.StatusTooManyRequests {
-		return nil, fmt.Errorf("rate limit exceeded, reset in: %s, current limit: %d", rateLimit.Period.String(), rateLimit.Limit)
+	if rateLimit.Remaining == 0 {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+		return nil, &DuffelError{
+			StatusCode: http.StatusTooManyRequests,
+			Retryable:  true,
+			Errors: []Error{
+				{
+					Type:  RateLimitError,
+					Title: "Rate limit exceeded",
+					Message: fmt.Sprintf(
+						"Rate limit exceeded, reset in: %s, current limit: %d", rateLimit.Period.String(),
+						rateLimit.Limit,
+					),
+					Code: RateLimitExceeded,
+				},
+			},
+		}
 	}
 	return resp, nil
 }

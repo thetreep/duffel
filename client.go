@@ -49,7 +49,9 @@ func encodePayload[T any](requestInput T) (io.ReadCloser, error) {
 	return io.NopCloser(payload), nil
 }
 
-func (c *client[R, T]) makeRequest(ctx context.Context, resourceName string, method string, body io.ReadCloser, opts ...RequestOption) (*http.Response, error) {
+func (c *client[R, T]) makeRequest(
+	ctx context.Context, resourceName string, method string, body io.ReadCloser, opts ...RequestOption,
+) (*http.Response, error) {
 	if c.APIToken == "" {
 		return nil, fmt.Errorf("duffel: missing API token")
 	}
@@ -149,14 +151,16 @@ func decodeError(response *http.Response) error {
 
 	contentType := response.Header.Get("Content-Type")
 
+	retryable := response.StatusCode == http.StatusServiceUnavailable ||
+		response.StatusCode == http.StatusGatewayTimeout
+
 	if strings.HasPrefix(contentType, "text/html") {
-		// Handle occasional HTML error pages at routing layer
 		return &DuffelError{
 			StatusCode: response.StatusCode,
-			Retryable:  true,
+			Retryable:  retryable,
 			Errors: []Error{
 				{
-					Type:    ErrorType(InternalServerError),
+					Type:    ApiError,
 					Title:   http.StatusText(response.StatusCode),
 					Message: "An internal server error occurred. Please try again later.",
 					Code:    InternalServerError,
@@ -165,12 +169,9 @@ func decodeError(response *http.Response) error {
 		}
 	}
 
-	notRetryable := strings.HasPrefix(response.Request.URL.Path, "/air/orders") &&
-		response.StatusCode == http.StatusInternalServerError
-
 	derr := &DuffelError{
 		StatusCode: response.StatusCode,
-		Retryable:  !notRetryable,
+		Retryable:  retryable,
 	}
 	err = json.NewDecoder(reader).Decode(derr)
 	if err != nil {
