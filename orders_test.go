@@ -19,7 +19,9 @@ func TestUnmarshalOrderWithCurrency(t *testing.T) {
 	a := assert.New(t)
 	order := new(Order)
 
-	err := json.Unmarshal([]byte(`{"base_amount": "120.00", "base_currency": "USD", "cancelled_at":"2020-04-11T15:48:11.642Z"}`), order)
+	err := json.Unmarshal(
+		[]byte(`{"base_amount": "120.00", "base_currency": "USD", "cancelled_at":"2020-04-11T15:48:11.642Z"}`), order,
+	)
 	a.NoError(err)
 
 	a.Equal("120.00 USD", order.BaseAmount().String())
@@ -45,46 +47,50 @@ func TestCreateOrder(t *testing.T) {
 
 	ctx := context.TODO()
 	client := New("duffel_test_123")
-	order, err := client.CreateOrder(ctx, CreateOrderInput{
-		Type:     OrderTypeInstant,
-		Metadata: Metadata{"seat_preference": "isle", "meal_preference": "NLML", "payment_intent_id": "pit_00009htYpSCXrwaB9DnUm2"},
-		Services: []ServiceCreateInput{
-			{
-				ID:       "ase_00009hj8USM7Ncg31cB123",
-				Quantity: 1,
+	order, err := client.CreateOrder(
+		ctx, CreateOrderInput{
+			Type: OrderTypeInstant,
+			Metadata: Metadata{
+				"seat_preference": "isle", "meal_preference": "NLML", "payment_intent_id": "pit_00009htYpSCXrwaB9DnUm2",
 			},
-		},
-		SelectedOffers: []string{"off_00009htyDGjIfajdNBZRlw"},
-		Payments: []PaymentCreateInput{
-			{
-				Type:     "balance",
-				Currency: "GBP",
-				Amount:   "30.20",
+			Services: []ServiceCreateInput{
+				{
+					ID:       "ase_00009hj8USM7Ncg31cB123",
+					Quantity: 1,
+				},
 			},
-		},
-		Passengers: []OrderPassenger{
-			{
-				Type:              PassengerTypeAdult,
-				ID:                "pas_00009hj8USM7Ncg31cBCLL",
-				Title:             PassengerTitleMrs,
-				FamilyName:        "Earhart",
-				GivenName:         "Amelia",
-				BornOn:            Date(time.Date(1987, time.July, 24, 0, 0, 0, 0, time.UTC)),
-				Gender:            GenderFemale,
-				InfantPassengerID: "pas_00009hj8USM8Ncg32aTGHL",
-				PhoneNumber:       "+442080160509",
-				Email:             "amelia@duffel.com",
-				IdentityDocuments: []IdentityDocument{
-					{
-						UniqueIdentifier:   "19KL56147",
-						ExpiresOn:          Date(time.Date(2025, time.April, 25, 0, 0, 0, 0, time.UTC)),
-						IssuingCountryCode: "GB",
-						Type:               "passport",
+			SelectedOffers: []string{"off_00009htyDGjIfajdNBZRlw"},
+			Payments: []PaymentCreateInput{
+				{
+					Type:     "balance",
+					Currency: "GBP",
+					Amount:   "30.20",
+				},
+			},
+			Passengers: []OrderPassenger{
+				{
+					Type:              PassengerTypeAdult,
+					ID:                "pas_00009hj8USM7Ncg31cBCLL",
+					Title:             PassengerTitleMrs,
+					FamilyName:        "Earhart",
+					GivenName:         "Amelia",
+					BornOn:            Date(time.Date(1987, time.July, 24, 0, 0, 0, 0, time.UTC)),
+					Gender:            GenderFemale,
+					InfantPassengerID: "pas_00009hj8USM8Ncg32aTGHL",
+					PhoneNumber:       "+442080160509",
+					Email:             "amelia@duffel.com",
+					IdentityDocuments: []IdentityDocument{
+						{
+							UniqueIdentifier:   "19KL56147",
+							ExpiresOn:          Date(time.Date(2025, time.April, 25, 0, 0, 0, 0, time.UTC)),
+							IssuingCountryCode: "GB",
+							Type:               "passport",
+						},
 					},
 				},
 			},
 		},
-	})
+	)
 	a.NoError(err)
 	reqID, _ := client.LastRequestID()
 	a.Equal("FvxRwfnMtKgc0EwCCoXE", reqID)
@@ -100,7 +106,99 @@ func TestCreateOrder(t *testing.T) {
 	a.Equal("Economy Basic", order.Slices[0].Segments[0].Passengers[0].CabinClassMarketingName)
 	a.Equal("14B", order.Slices[0].Segments[0].Passengers[0].Seat.Designator)
 	a.Equal("Exit row seat", order.Slices[0].Segments[0].Passengers[0].Seat.Name)
-	a.Equal([]string{"Do not seat children in exit row seats", "Do not seat passengers with special needs in exit row seats"}, order.Slices[0].Segments[0].Passengers[0].Seat.Disclosures)
+	a.Equal(
+		[]string{
+			"Do not seat children in exit row seats", "Do not seat passengers with special needs in exit row seats",
+		}, order.Slices[0].Segments[0].Passengers[0].Seat.Disclosures,
+	)
+}
+
+func TestCreateOrderAwaitingCreation(t *testing.T) {
+	defer gock.Off()
+	a := assert.New(t)
+
+	gock.New("https://api.duffel.com").
+		Post("/air/orders").
+		Reply(200).
+		SetHeader(RequestIDHeader, "AwaitingReq123").
+		SetHeader("Ratelimit-Limit", "5").
+		SetHeader("Ratelimit-Remaining", "5").
+		SetHeader("Ratelimit-Reset", time.Now().Format(time.RFC1123)).
+		SetHeader("Date", time.Now().Format(time.RFC1123)).
+		File("fixtures/200-create-order-awaiting.json")
+
+	ctx := context.TODO()
+	client := New("duffel_test_123")
+	order, err := client.CreateOrder(
+		ctx, CreateOrderInput{
+			Type:           OrderTypeInstant,
+			SelectedOffers: []string{"off_123"},
+			Passengers:     []OrderPassenger{},
+		},
+	)
+	a.NoError(err)
+	a.True(order.IsAwaitingCreation)
+	a.False(order.IsPendingConfirmation)
+	a.NotNil(order.Message)
+	a.Equal("The booking has been confirmed. It will appear in the system soon.", *order.Message)
+}
+
+func TestCreateOrderPendingConfirmation(t *testing.T) {
+	defer gock.Off()
+	a := assert.New(t)
+
+	gock.New("https://api.duffel.com").
+		Post("/air/orders").
+		Reply(202).
+		SetHeader(RequestIDHeader, "PendingReq456").
+		SetHeader("Ratelimit-Limit", "5").
+		SetHeader("Ratelimit-Remaining", "5").
+		SetHeader("Ratelimit-Reset", time.Now().Format(time.RFC1123)).
+		SetHeader("Date", time.Now().Format(time.RFC1123)).
+		File("fixtures/202-create-order-pending.json")
+
+	ctx := context.TODO()
+	client := New("duffel_test_123")
+	order, err := client.CreateOrder(
+		ctx, CreateOrderInput{
+			Type:           OrderTypeInstant,
+			SelectedOffers: []string{"off_456"},
+			Passengers:     []OrderPassenger{},
+		},
+	)
+	a.NoError(err)
+	a.True(order.IsPendingConfirmation)
+	a.False(order.IsAwaitingCreation)
+	a.NotNil(order.Message)
+}
+
+func TestCreateOrderNormal(t *testing.T) {
+	defer gock.Off()
+	a := assert.New(t)
+
+	gock.New("https://api.duffel.com").
+		Post("/air/orders").
+		Reply(201).
+		SetHeader(RequestIDHeader, "NormalReq789").
+		SetHeader("Ratelimit-Limit", "5").
+		SetHeader("Ratelimit-Remaining", "5").
+		SetHeader("Ratelimit-Reset", time.Now().Format(time.RFC1123)).
+		SetHeader("Date", time.Now().Format(time.RFC1123)).
+		File("fixtures/201-create-order.json")
+
+	ctx := context.TODO()
+	client := New("duffel_test_123")
+	order, err := client.CreateOrder(
+		ctx, CreateOrderInput{
+			Type:           OrderTypeInstant,
+			SelectedOffers: []string{"off_789"},
+			Passengers:     []OrderPassenger{},
+		},
+	)
+	a.NoError(err)
+	a.False(order.IsAwaitingCreation)
+	a.False(order.IsPendingConfirmation)
+	a.Equal("ord_00009hthhsUZ8W4LxQgkjo", order.ID)
 }
 
 func TestListOrders(t *testing.T) {
@@ -128,9 +226,11 @@ func TestListOrders(t *testing.T) {
 
 	ctx := context.TODO()
 	client := New("duffel_test_123")
-	iter := client.ListOrders(ctx, ListOrdersParams{
-		BookingReference: "RZPNX8",
-	})
+	iter := client.ListOrders(
+		ctx, ListOrdersParams{
+			BookingReference: "RZPNX8",
+		},
+	)
 
 	iter.Next()
 	a.NoError(iter.Err())
@@ -181,9 +281,13 @@ func TestUpdateOrder(t *testing.T) {
 	gock.New("https://api.duffel.com").
 		Patch("/air/orders/ord_00009hthhsUZ8W4LxQgkjo").
 		MatchType("json").
-		JSON(Payload[OrderUpdateParams]{Data: OrderUpdateParams{
-			Metadata: map[string]any{"seat_preference": "window"},
-		}}).
+		JSON(
+			Payload[OrderUpdateParams]{
+				Data: OrderUpdateParams{
+					Metadata: map[string]any{"seat_preference": "window"},
+				},
+			},
+		).
 		Reply(200).
 		SetHeader("Ratelimit-Limit", "5").
 		SetHeader("Ratelimit-Remaining", "5").
@@ -193,11 +297,13 @@ func TestUpdateOrder(t *testing.T) {
 
 	ctx := context.TODO()
 	client := New("duffel_test_123")
-	order, err := client.UpdateOrder(ctx, "ord_00009hthhsUZ8W4LxQgkjo", OrderUpdateParams{
-		Metadata: map[string]any{
-			"seat_preference": "window",
+	order, err := client.UpdateOrder(
+		ctx, "ord_00009hthhsUZ8W4LxQgkjo", OrderUpdateParams{
+			Metadata: map[string]any{
+				"seat_preference": "window",
+			},
 		},
-	})
+	)
 	a.NoError(err)
 
 	a.Equal("RZPNX8", order.BookingReference)

@@ -1,0 +1,19 @@
+{
+  "errors": [
+    {
+      "code": "validation_required",
+      "documentation_url": "https://duffel.com/docs/api/overview/errors",
+      "message": "Field 'origin' can't be blank",
+      "title": "Required field",
+      "type": "validation_error",
+      "source": {
+        "field": "origin",
+        "pointer": "/slices/0/origin"
+      }
+    }
+  ],
+  "meta": {
+    "request_id": "FZW0cz5rZoJSEekAAK2B",
+    "status": 422
+  }
+}

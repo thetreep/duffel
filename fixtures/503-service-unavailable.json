@@ -1,0 +1,15 @@
+{
+  "errors": [
+    {
+      "code": "internal_server_error",
+      "documentation_url": "https://duffel.com/docs/api/overview/errors",
+      "message": "Service temporarily unavailable, please try again later",
+      "title": "Service Unavailable",
+      "type": "api_error"
+    }
+  ],
+  "meta": {
+    "request_id": "FZW0H3HdJwKk5HMAAXYZ",
+    "status": 503
+  }
+}

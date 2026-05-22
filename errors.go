@@ -106,6 +106,90 @@ const (
 
 	// The version set to the Duffel-Version header is no longer supported by the API, please upgrade
 	UnsupportedVersion ErrorCode = "unsupported_version"
+
+	// The price of the offer has changed since it was last retrieved
+	PriceChanged ErrorCode = "price_changed"
+
+	// The payment was declined by the payment provider
+	PaymentDeclined ErrorCode = "payment_declined"
+
+	// The selected offer has already expired
+	OfferExpired ErrorCode = "offer_expired"
+
+	// The order is invalid
+	InvalidOrder ErrorCode = "invalid_order"
+
+	// The order has been modified by an external system
+	ModifiedExternally ErrorCode = "modified_externally"
+
+	// The request to create an order was not successful
+	OrderNotCreated ErrorCode = "order_not_created"
+
+	// The provided order cannot be cancelled
+	OrderNotCancellable ErrorCode = "order_not_cancellable"
+
+	// The order cannot be changed through the API
+	OrderNotChangeable ErrorCode = "order_not_changeable"
+
+	// Changes to this order are not permitted at this time
+	OrderNotChangeableYet ErrorCode = "order_not_changeable_yet"
+
+	// The order change has already been actioned
+	OrderChangeAlreadyActioned ErrorCode = "order_change_already_actioned"
+
+	// An offer from this offer request has already been booked
+	OfferRequestAlreadyBooked ErrorCode = "offer_request_already_booked"
+
+	// Order creation has already been attempted for an offer from this request
+	OrderCreationAlreadyAttempted ErrorCode = "order_creation_already_attempted"
+
+	// The passenger name format is not valid
+	InvalidPassengerName ErrorCode = "invalid_passenger_name"
+
+	// The title of one of the passengers is not valid
+	InvalidPassengerTitle ErrorCode = "invalid_passenger_title"
+
+	// The phone number is not valid
+	InvalidPhoneNumber ErrorCode = "invalid_phone_number"
+
+	// The airline does not support the format of the email address provided
+	InvalidEmailAddress ErrorCode = "invalid_email_address"
+
+	// The card has an invalid expiration date
+	InvalidCardExpirationDate ErrorCode = "invalid_card_expiration_date"
+
+	// The intended card attached to the offer is invalid
+	InvalidIntendedCard ErrorCode = "invalid_intended_card"
+
+	// The 3D Secure session was not found
+	ThreeDSecureSessionNotFound ErrorCode = "three_d_secure_session_not_found"
+
+	// The 3D Secure session is not ready for payment
+	ThreeDSecureSessionNotReadyForPayment ErrorCode = "three_d_secure_session_not_ready_for_payment"
+
+	// The 3D Secure session has expired
+	ThreeDSecureSessionExpired ErrorCode = "three_d_secure_session_expired"
+
+	// The payment amount does not match the order total amount
+	PaymentAmountDoesNotMatchOrderAmount ErrorCode = "payment_amount_does_not_match_order_amount"
+
+	// The payment currency does not match the order total currency
+	PaymentCurrencyDoesNotMatchOrderCurrency ErrorCode = "payment_currency_does_not_match_order_currency"
+
+	// The passengers on the order are not compatible with the offer
+	OrderPassengersIncompatibleWithOffer ErrorCode = "order_passengers_incompatible_with_offer"
+
+	// This feature is unavailable in the current API version
+	UnavailableInVersion ErrorCode = "unavailable_in_version"
+
+	// A required field is missing
+	ValidationRequired ErrorCode = "validation_required"
+
+	// The airline credit is ineligible for this operation
+	IneligibleAirlineCredit ErrorCode = "ineligible_airline_credit"
+
+	// The order contains passengers with duplicate names
+	DuplicatePassengerNames ErrorCode = "duplicate_passenger_names"
 )
 
 // IsErrorCode is a concenience method to check if an error is a specific error code from Duffel.
@@ -180,12 +264,18 @@ func (e *DuffelError) IsCode(t ErrorCode) bool {
 	return false
 }
 
+type ErrorSource struct {
+	Field   string `json:"field"`
+	Pointer string `json:"pointer"`
+}
+
 type Error struct {
-	Type             ErrorType `json:"type"`
-	Title            string    `json:"title"`
-	Message          string    `json:"message"`
-	DocumentationURL string    `json:"documentation_url"`
-	Code             ErrorCode `json:"code"`
+	Type             ErrorType    `json:"type"`
+	Title            string       `json:"title"`
+	Message          string       `json:"message"`
+	DocumentationURL string       `json:"documentation_url"`
+	Code             ErrorCode    `json:"code"`
+	Source           *ErrorSource `json:"source,omitempty"`
 }
 
 type ErrorMeta struct {

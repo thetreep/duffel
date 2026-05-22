@@ -4,7 +4,10 @@
 
 package duffel
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 // WithAPIToken sets the API host to the default Duffel production host.
 func WithDefaultAPI() Option {
@@ -47,5 +50,14 @@ func WithHTTPClient(client *http.Client) Option {
 func WithDebug() Option {
 	return func(c *Options) {
 		c.Debug = true
+	}
+}
+
+// WithTimeout sets the deadline timeout.
+// The Duffel API recommends at least 130 seconds for order creation endpoints.
+// Default is 130 seconds.
+func WithTimeout(d time.Duration) Option {
+	return func(c *Options) {
+		c.Timeout = d
 	}
 }

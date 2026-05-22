@@ -13,6 +13,7 @@ import (
 
 const userAgentString = "duffel-go/1.0"
 const defaultHost = "https://api.duffel.com/"
+const defaultTimeout = 130 * time.Second
 
 type (
 	Duffel interface {
@@ -259,6 +260,7 @@ type (
 		UserAgent string
 		HttpDoer  *http.Client
 		Debug     bool
+		Timeout   time.Duration
 	}
 
 	client[Req any, Resp any] struct {
@@ -336,6 +338,7 @@ func New(apiToken string, opts ...Option) Duffel {
 		UserAgent: userAgentString,
 		Host:      defaultHost,
 		HttpDoer:  http.DefaultClient,
+		Timeout:   defaultTimeout,
 	}
 	for _, opt := range opts {
 		opt(options)
