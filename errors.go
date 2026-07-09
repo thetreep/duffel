@@ -4,7 +4,10 @@
 
 package duffel
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type ErrorType string
 
@@ -267,6 +270,15 @@ func (e *DuffelError) IsCode(t ErrorCode) bool {
 type ErrorSource struct {
 	Field   string `json:"field"`
 	Pointer string `json:"pointer"`
+	Airline string `json:"-"`
+}
+
+func (s *ErrorSource) UnmarshalJSON(data []byte) error {
+	if len(data) > 0 && data[0] == '"' {
+		return json.Unmarshal(data, &s.Airline)
+	}
+	type alias ErrorSource
+	return json.Unmarshal(data, (*alias)(s))
 }
 
 type Error struct {
