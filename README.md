@@ -47,7 +47,7 @@ total.String() // 100.00 USD
 
 ### Working with iterators
 
-All requests that return more than one record will return an iterator. An Iterator automatically paginates results and respects rate limits, reducing the complexity of the overall programming model.
+All requests that return more than one record will return an iterator. An Iterator automatically paginates results, reducing the complexity of the overall programming model.
 
 ```go
 dfl := duffel.New(os.Getenv("DUFFEL_TOKEN"))
@@ -151,7 +151,7 @@ To maintain simplicity and ease of use, this client library is hand-coded (inste
 - [x] API Client
 - [x] Error handling
 - [x] Pagination _(using iterators)_
-- [x] Rate Limiting _(automatically throttles requests to stay under limit)_
+- [x] Rate Limiting _(a real 429 is a retryable error with `RetryAfter`; `LastRateLimit()` exposes the parsed headers)_
 - [x] Offer Requests
 - [x] Offers
 - [x] Orders

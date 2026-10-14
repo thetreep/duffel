@@ -86,7 +86,7 @@ type (
 	OrderChangeRequestParams struct {
 		OrderID      string                   `json:"order_id"`
 		PrivateFares map[string][]PrivateFare `json:"private_fares,omitempty"`
-		Slices       SliceChange              `json:"slices,omitempty"`
+		Slices       SliceChange              `json:"slices"`
 	}
 
 	SliceAdd struct {
@@ -114,12 +114,18 @@ type (
 	ListOrderChangeOffersSortParam string
 
 	OrderChangeClient interface {
-		CreateOrderChangeRequest(ctx context.Context, params OrderChangeRequestParams) (*OrderChangeRequest, error)
-		GetOrderChangeRequest(ctx context.Context, id string) (*OrderChangeRequest, error)
-		CreatePendingOrderChange(ctx context.Context, orderChangeRequestID string) (*OrderChange, error)
-		ConfirmOrderChange(ctx context.Context, id string, payment PaymentCreateInput) (*OrderChange, error)
-		GetOrderChange(ctx context.Context, id string) (*OrderChange, error)
-		GetOrderChangeOffer(ctx context.Context, id string) (*OrderChangeOffer, error)
+		CreateOrderChangeRequest(
+			ctx context.Context, params OrderChangeRequestParams, opts ...RequestOption,
+		) (*OrderChangeRequest, error)
+		GetOrderChangeRequest(ctx context.Context, id string, opts ...RequestOption) (*OrderChangeRequest, error)
+		CreatePendingOrderChange(ctx context.Context, orderChangeRequestID string, opts ...RequestOption) (
+			*OrderChange, error,
+		)
+		ConfirmOrderChange(
+			ctx context.Context, id string, payment PaymentCreateInput, opts ...RequestOption,
+		) (*OrderChange, error)
+		GetOrderChange(ctx context.Context, id string, opts ...RequestOption) (*OrderChange, error)
+		GetOrderChangeOffer(ctx context.Context, id string, opts ...RequestOption) (*OrderChangeOffer, error)
 		ListOrderChangeOffers(ctx context.Context, params ...ListOrderChangeOffersParams) *Iter[OrderChangeOffer]
 	}
 )
@@ -129,27 +135,31 @@ const (
 	SortParamTotalDuration     ListOrderChangeOffersSortParam = "total_duration"
 )
 
-func (a *API) CreateOrderChangeRequest(ctx context.Context, params OrderChangeRequestParams) (
+func (a *API) CreateOrderChangeRequest(ctx context.Context, params OrderChangeRequestParams, opts ...RequestOption) (
 	*OrderChangeRequest, error,
 ) {
 	return newRequestWithAPI[OrderChangeRequestParams, OrderChangeRequest](a).
 		Post("/air/order_change_requests", &params).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
 // GetOrderChangeRequest retrieves an order change request by its ID.
-func (a *API) GetOrderChangeRequest(ctx context.Context, orderChangeRequestID string) (*OrderChangeRequest, error) {
+func (a *API) GetOrderChangeRequest(
+	ctx context.Context, orderChangeRequestID string, opts ...RequestOption,
+) (*OrderChangeRequest, error) {
 	if err := validateID(orderChangeRequestID, orderChangeRequestIDPrefix); err != nil {
 		return nil, err
 	}
 
 	return newRequestWithAPI[EmptyPayload, OrderChangeRequest](a).
 		Getf("/air/order_change_requests/%s", orderChangeRequestID).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
 // CreatePendingOrderChange creates a new pending order change.
-func (a *API) CreatePendingOrderChange(ctx context.Context, offerID string) (*OrderChange, error) {
+func (a *API) CreatePendingOrderChange(ctx context.Context, offerID string, opts ...RequestOption) (
+	*OrderChange, error,
+) {
 	if err := validateID(offerID, orderChangeOfferIDPrefix); err != nil {
 		return nil, err
 	}
@@ -157,12 +167,13 @@ func (a *API) CreatePendingOrderChange(ctx context.Context, offerID string) (*Or
 	return newRequestWithAPI[map[string]string, OrderChange](a).
 		Postf("/air/order_changes").
 		Body(&map[string]string{"selected_order_change_offer": offerID}).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
 // ConfirmOrderChange confirms a pending order change.
 func (a *API) ConfirmOrderChange(
 	ctx context.Context, orderChangeRequestID string, payment PaymentCreateInput,
+	opts ...RequestOption,
 ) (*OrderChange, error) {
 	if err := validateID(orderChangeRequestID, orderChangeRequestIDPrefix); err != nil {
 		return nil, err
@@ -171,29 +182,29 @@ func (a *API) ConfirmOrderChange(
 	return newRequestWithAPI[PaymentCreateInput, OrderChange](a).
 		Postf("/air/order_changes/%s/actions/confirm", orderChangeRequestID).
 		Body(&payment).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
 // GetOrderChange retrieves an order change by its ID.
-func (a *API) GetOrderChange(ctx context.Context, id string) (*OrderChange, error) {
+func (a *API) GetOrderChange(ctx context.Context, id string, opts ...RequestOption) (*OrderChange, error) {
 	if err := validateID(id, orderChangeIDPrefix); err != nil {
 		return nil, err
 	}
 
 	return newRequestWithAPI[EmptyPayload, OrderChange](a).
 		Getf("/air/order_changes/%s", id).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
 // GetOrderChangeOffer retrieves an order change offer by its ID.
-func (a *API) GetOrderChangeOffer(ctx context.Context, id string) (*OrderChangeOffer, error) {
+func (a *API) GetOrderChangeOffer(ctx context.Context, id string, opts ...RequestOption) (*OrderChangeOffer, error) {
 	if err := validateID(id, orderChangeOfferIDPrefix); err != nil {
 		return nil, err
 	}
 
 	return newRequestWithAPI[EmptyPayload, OrderChangeOffer](a).
 		Getf("/air/order_change_offers/%s", id).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
 // ListOrderChangeOffers retrieves a paginated list of order change offers.

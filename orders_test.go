@@ -6,6 +6,7 @@ package duffel
 
 import (
 	"context"
+	"net/url"
 	"testing"
 	"time"
 
@@ -136,9 +137,10 @@ func TestCreateOrderAwaitingCreation(t *testing.T) {
 			Passengers:     []OrderPassenger{},
 		},
 	)
-	a.NoError(err)
+	a.ErrorIs(err, ErrOrderAwaitingCreation)
 	a.True(order.IsAwaitingCreation)
 	a.False(order.IsPendingConfirmation)
+	a.Empty(order.ID)
 	a.NotNil(order.Message)
 	a.Equal("The booking has been confirmed. It will appear in the system soon.", *order.Message)
 }
@@ -309,4 +311,59 @@ func TestUpdateOrder(t *testing.T) {
 	a.Equal("RZPNX8", order.BookingReference)
 	a.Equal(Metadata{"seat_preference": "window"}, order.Metadata)
 	a.Equal("ord_00009hthhsUZ8W4LxQgkjo", order.ID)
+}
+
+func TestAirlineInitiatedChangeActionTaken(t *testing.T) {
+	a := assert.New(t)
+	var aic AirlineInitiatedChanges
+	a.NoError(json.Unmarshal([]byte(`{"action_taken":"accepted","action_taken_at":"2026-01-01T10:00:00Z","available_actions":["update"]}`), &aic))
+	a.Equal(ActionTakenTypeAccepted, aic.ActionTaken)
+	a.Equal(time.Date(2026, 1, 1, 10, 0, 0, 0, time.UTC), aic.ActionTakenAt)
+	a.Equal([]AvailableActionType{AvailableActionTypeUpdate}, aic.AvailableActions)
+}
+
+func TestOrderAvailableActions(t *testing.T) {
+	a := assert.New(t)
+	var order Order
+	a.NoError(json.Unmarshal([]byte(`{"available_actions":["cancel","change"]}`), &order))
+	a.Equal([]AvailableActionType{AvailableActionTypeCancel, AvailableActionTypeChange}, order.AvailableActions)
+}
+
+func TestOrderUpdateParamsMetadataTag(t *testing.T) {
+	b, err := json.Marshal(OrderUpdateParams{Metadata: map[string]any{"k": "v"}})
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"metadata":{"k":"v"}}`, string(b))
+}
+
+func TestListOrdersParamsEncode(t *testing.T) {
+	paris, err := time.LoadLocation("Europe/Paris")
+	assert.NoError(t, err)
+	after := time.Date(2026, 10, 14, 10, 0, 0, 0, paris)
+	before := time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
+	beforeFrac := before.Add(500 * time.Millisecond)
+
+	tests := []struct {
+		name   string
+		params ListOrdersParams
+		want   string
+	}{
+		{"empty", ListOrdersParams{}, ""},
+		{"created_at local time", ListOrdersParams{CreatedAt: &TimeFilter{After: &after}}, "created_at[after]=2026-10-14T08:00:00"},
+		{"departing_at both bounds", ListOrdersParams{DepartingAt: &TimeFilter{After: &after, Before: &before}}, "departing_at[after]=2026-10-14T10:00:00&departing_at[before]=2026-10-14T09:00:00"},
+		{"arriving_at", ListOrdersParams{ArrivingAt: &TimeFilter{Before: &beforeFrac}}, "arriving_at[before]=2026-10-14T09:00:00.5"},
+		{"passenger names", ListOrdersParams{PassengerNames: []string{"a", "b"}}, "passenger_name[]=a&passenger_name[]=b"},
+		{"owner ids", ListOrdersParams{OwnerIDs: []string{"arl_1"}}, "owner_id[]=arl_1"},
+		{"origin ids", ListOrdersParams{OriginIDs: []string{"arp_1"}}, "origin_id[]=arp_1"},
+		{"destination ids", ListOrdersParams{DestinationIDs: []string{"arp_2"}}, "destination_id[]=arp_2"},
+		{"scalars", ListOrdersParams{BookingReference: "RZPNX8", AwaitingPayment: true, Sort: ListOrdersSortPaymentRequiredByDesc}, "awaiting_payment=true&booking_reference=RZPNX8&sort=-payment_required_by"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			q := url.Values{}
+			assert.NoError(t, tt.params.Encode(q))
+			got, err := url.QueryUnescape(q.Encode())
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

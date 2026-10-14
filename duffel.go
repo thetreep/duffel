@@ -6,9 +6,8 @@ package duffel
 
 import (
 	"net/http"
+	"sync/atomic"
 	"time"
-
-	"golang.org/x/time/rate"
 )
 
 const userAgentString = "duffel-go/1.0"
@@ -31,7 +30,12 @@ type (
 		PaymentCardClient
 		LoyaltyProgrammeClient
 
+		// LastRequestID returns the x-request-id of the latest response. Under concurrent use it may belong
+		// to another call: prefer RequestIDFromError or List.LastRequestID for a value tied to one call.
 		LastRequestID() (string, bool)
+
+		// LastRateLimit returns the latest valid Ratelimit-* headers. Under concurrent use it may belong to another call.
+		LastRateLimit() (*RateLimit, bool)
 	}
 
 	Gender string
@@ -43,8 +47,8 @@ type (
 		Origin          Location     `json:"origin"`
 		DestinationType LocationType `json:"destination_type"`
 		Destination     Location     `json:"destination"`
-		DepartureDate   Date         `json:"departure_date,omitempty"`
-		CreatedAt       time.Time    `json:"created_at,omitempty"`
+		DepartureDate   Date         `json:"departure_date"`
+		CreatedAt       time.Time    `json:"created_at"`
 	}
 
 	// TODO: We probably need an OfferRequestSlice and an OrderSlice since not all fields apply to both.
@@ -56,7 +60,7 @@ type (
 		Changeable bool `json:"changeable,omitempty"`
 
 		// The conditions associated with this slice, describing the kinds of modifications you can make and any penalties that will apply to those modifications.
-		Conditions    SliceConditions `json:"conditions,omitempty"`
+		Conditions    SliceConditions `json:"conditions"`
 		Duration      Duration        `json:"duration,omitempty"`
 		Segments      []Flight        `json:"segments,omitempty"`
 		FareBrandName string          `json:"fare_brand_name,omitempty"`
@@ -123,7 +127,7 @@ type (
 	Airport struct {
 		ID              string  `json:"id" `
 		Name            string  `json:"name" `
-		City            City    `json:"city,omitempty" `
+		City            City    `json:"city" `
 		CityName        string  `json:"city_name" `
 		IATACode        string  `json:"iata_code" `
 		IATACountryCode string  `json:"iata_country_code" `
@@ -264,19 +268,16 @@ type (
 	}
 
 	client[Req any, Resp any] struct {
-		httpDoer      *http.Client
-		APIToken      string
-		options       *Options
-		limiter       *rate.Limiter
-		rateLimit     *RateLimit
-		afterResponse []func(resp *http.Response)
+		api *API
 	}
 
+	// API is safe for concurrent use.
 	API struct {
 		httpDoer      *http.Client
 		APIToken      string
 		options       *Options
-		lastRequestID string
+		lastRequestID atomic.Pointer[string]
+		lastRateLimit atomic.Pointer[RateLimit]
 	}
 )
 
@@ -352,7 +353,26 @@ func New(apiToken string, opts ...Option) Duffel {
 }
 
 func (a *API) LastRequestID() (string, bool) {
-	return a.lastRequestID, a.lastRequestID != ""
+	id := a.lastRequestID.Load()
+	if id == nil || *id == "" {
+		return "", false
+	}
+	return *id, true
+}
+
+func (a *API) LastRateLimit() (*RateLimit, bool) {
+	rl := a.lastRateLimit.Load()
+	return rl, rl != nil
+}
+
+func (a *API) recordResponse(resp *http.Response) *RateLimit {
+	id := resp.Header.Get(RequestIDHeader)
+	a.lastRequestID.Store(&id)
+	rl := parseRateLimit(resp)
+	if rl != nil {
+		a.lastRateLimit.Store(rl)
+	}
+	return rl
 }
 
 // Assert that our interface matches

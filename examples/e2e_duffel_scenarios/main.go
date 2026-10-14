@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -35,7 +36,7 @@ func main() {
 			{Number: 1, AutoMerge: true},
 			{Number: 2, AutoMerge: false},
 			{
-				Number: 3, AutoMerge: false, Transformer: func(val interface{}) string {
+				Number: 3, AutoMerge: false, Transformer: func(val any) string {
 					if val == "PASSED" {
 						return text.FgGreen.Sprint(val)
 					}
@@ -372,7 +373,14 @@ func testCardPaymentSuccess(ctx context.Context, client duffel.Duffel, cardsAPIC
 	)
 
 	order, err := createOrder(ctx, client, allOffers[0], duffel.PaymentMethodCard, card.ID)
-	if err != nil {
+	if errors.Is(err, duffel.ErrOrderAwaitingCreation) {
+		t.AppendRow(
+			table.Row{
+				"Card Payment Success", "Create Order", "PASSED", fmt.Sprintf("Awaiting creation: %s", *order.Message),
+			},
+			rowConfigAutoMerge,
+		)
+	} else if err != nil {
 		t.AppendRow(
 			table.Row{"Card Payment Success", "Create Order", "FAILED", fmt.Sprintf("Error: %v", err)},
 			rowConfigAutoMerge,

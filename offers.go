@@ -21,6 +21,7 @@ type (
 	OfferClient interface {
 		UpdateOfferPassenger(
 			ctx context.Context, offerRequestID, passengerID string, input PassengerUpdateInput,
+			opts ...RequestOption,
 		) (*OfferRequestPassenger, error)
 		ListOffers(ctx context.Context, reqId string, options ...ListOffersParams) *Iter[Offer]
 		GetOffer(ctx context.Context, id string, params ...GetOfferParams) (*Offer, error)
@@ -32,7 +33,7 @@ type (
 		CreatedAt                               time.Time               `json:"created_at"`
 		UpdatedAt                               time.Time               `json:"updated_at"`
 		ExpiresAt                               time.Time               `json:"expires_at"`
-		TotalEmissionsKg                        interface{}             `json:"total_emissions_kg"`
+		TotalEmissionsKg                        any                     `json:"total_emissions_kg"`
 		RawTotalCurrency                        string                  `json:"total_currency"`
 		RawTotalAmount                          string                  `json:"total_amount"`
 		RawTaxAmount                            string                  `json:"tax_amount"`
@@ -161,9 +162,12 @@ const (
 // UpdateOfferPassenger updates a single offer passenger.
 func (a *API) UpdateOfferPassenger(
 	ctx context.Context, offerRequestID, passengerID string, input PassengerUpdateInput,
+	opts ...RequestOption,
 ) (*OfferRequestPassenger, error) {
 	url := fmt.Sprintf("/air/offers/%s/passengers/%s", offerRequestID, passengerID)
-	return newRequestWithAPI[PassengerUpdateInput, OfferRequestPassenger](a).Patch(url, &input).Single(ctx)
+	return newRequestWithAPI[PassengerUpdateInput, OfferRequestPassenger](a).Patch(
+		url, &input,
+	).WithOptions(opts...).Single(ctx)
 }
 
 // ListOffers lists all the offers for an offer request. Returns an iterator.

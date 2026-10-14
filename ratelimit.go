@@ -5,7 +5,6 @@
 package duffel
 
 import (
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -16,7 +15,8 @@ type (
 		Limit     int
 		Remaining int
 		ResetAt   time.Time
-		Period    time.Duration
+		// Period is the time left until ResetAt, measured against the response Date header.
+		Period time.Duration
 	}
 )
 
@@ -25,39 +25,39 @@ var headerTimeFormats = []string{
 	"Mon, 2 Jan 2006 15:04:05 MST",
 }
 
-func parseRateLimit(resp *http.Response) (*RateLimit, error) {
-	rl := &RateLimit{}
-
+// parseRateLimit returns nil on missing or bad headers: they are advisory and must never fail a response.
+func parseRateLimit(resp *http.Response) *RateLimit {
 	limit, err := strconv.Atoi(resp.Header.Get("Ratelimit-Limit"))
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	rl.Limit = limit
-
 	remaining, err := strconv.Atoi(resp.Header.Get("Ratelimit-Remaining"))
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	rl.Remaining = remaining
+	resetAt, ok := parseHeaderTime(resp.Header.Get("Ratelimit-Reset"))
+	if !ok {
+		return nil
+	}
+	// Measure against the server clock when possible so local clock skew does not distort the period.
+	now, ok := parseHeaderTime(resp.Header.Get("Date"))
+	if !ok {
+		now = time.Now()
+	}
 
-	resetHeader := resp.Header.Get("Ratelimit-Reset")
+	return &RateLimit{
+		Limit:     limit,
+		Remaining: remaining,
+		ResetAt:   resetAt,
+		Period:    max(resetAt.Sub(now), 0),
+	}
+}
+
+func parseHeaderTime(v string) (time.Time, bool) {
 	for _, format := range headerTimeFormats {
-		if resetAt, err := time.Parse(format, resetHeader); err == nil {
-			rl.ResetAt = resetAt
-			break
+		if t, err := time.Parse(format, v); err == nil {
+			return t, true
 		}
 	}
-
-	if rl.ResetAt.IsZero() {
-		return nil, fmt.Errorf("failed to parse Ratelimit-Reset header: %s, no known date formats match", resetHeader)
-	}
-
-	date, err := time.Parse(time.RFC1123, resp.Header.Get("Date"))
-	if err != nil {
-		return nil, err
-	}
-
-	rl.Period = rl.ResetAt.Sub(date)
-
-	return rl, nil
+	return time.Time{}, false
 }

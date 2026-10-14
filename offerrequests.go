@@ -13,12 +13,12 @@ import (
 
 type (
 	OfferRequestClient interface {
-		CreateOfferRequest(ctx context.Context, requestInput OfferRequestInput) (*OfferRequest, error)
-		GetOfferRequest(ctx context.Context, id string) (*OfferRequest, error)
-		CreatePartialOfferRequest(ctx context.Context, requestInput OfferRequestInput) (*OfferRequest, error)
-		GetFullPartialOfferRequest(ctx context.Context, requestInput PartialOfferRequestInput) (*OfferRequest, error)
-		GetPartialOfferRequests(ctx context.Context, requestInput PartialOfferRequestInput) (*OfferRequest, error)
-		ListOfferRequests(ctx context.Context) *Iter[OfferRequest]
+		CreateOfferRequest(ctx context.Context, requestInput OfferRequestInput, opts ...RequestOption) (*OfferRequest, error)
+		GetOfferRequest(ctx context.Context, id string, opts ...RequestOption) (*OfferRequest, error)
+		CreatePartialOfferRequest(ctx context.Context, requestInput OfferRequestInput, opts ...RequestOption) (*OfferRequest, error)
+		GetFullPartialOfferRequest(ctx context.Context, requestInput PartialOfferRequestInput, opts ...RequestOption) (*OfferRequest, error)
+		GetPartialOfferRequests(ctx context.Context, requestInput PartialOfferRequestInput, opts ...RequestOption) (*OfferRequest, error)
+		ListOfferRequests(ctx context.Context, opts ...RequestOption) *Iter[OfferRequest]
 	}
 
 	OfferRequestInput struct {
@@ -35,14 +35,23 @@ type (
 		PrivateFares map[string][]PrivateFare `json:"private_fares,omitempty" url:"-"`
 
 		ReturnOffers bool `json:"-" url:"return_offers"`
-		// The maximum amount of time in milliseconds to wait for each airline to respond
+		// The maximum amount of time in milliseconds to wait for each airline to respond, 2000 to 60000, default 20000.
+		// Keep it below the client Timeout to get partial results instead of a client timeout. Zero leaves it unset.
 		SupplierTimeout int `json:"-" url:"supplier_timeout,omitempty"`
 	}
 
 	OfferRequestSlice struct {
-		DepartureDate Date   `json:"departure_date"`
-		Destination   string `json:"destination"`
-		Origin        string `json:"origin"`
+		DepartureDate Date        `json:"departure_date"`
+		Destination   string      `json:"destination"`
+		Origin        string      `json:"origin"`
+		DepartureTime *TimeWindow `json:"departure_time,omitempty"`
+		ArrivalTime   *TimeWindow `json:"arrival_time,omitempty"`
+	}
+
+	// TimeWindow is a local hh:mm range. Duffel rejects From == To with a 422.
+	TimeWindow struct {
+		From string `json:"from"`
+		To   string `json:"to"`
 	}
 
 	// The corporate_code and tour_code are provided to you by the airline and the tracking_reference is to identify your business by the airlines.
@@ -81,48 +90,62 @@ type (
 	}
 )
 
-func (a *API) CreateOfferRequest(ctx context.Context, requestInput OfferRequestInput) (*OfferRequest, error) {
+func (a *API) CreateOfferRequest(ctx context.Context, requestInput OfferRequestInput, opts ...RequestOption) (*OfferRequest, error) {
 	return newRequestWithAPI[OfferRequestInput, OfferRequest](a).
 		Post("/air/offer_requests", &requestInput).
 		WithParams(requestInput).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
-func (a *API) CreatePartialOfferRequest(ctx context.Context, requestInput OfferRequestInput) (*OfferRequest, error) {
+// CreatePartialOfferRequest sends SupplierTimeout but not ReturnOffers, which the partial endpoint does not take.
+func (a *API) CreatePartialOfferRequest(
+	ctx context.Context, requestInput OfferRequestInput, opts ...RequestOption,
+) (*OfferRequest, error) {
 	return newRequestWithAPI[OfferRequestInput, OfferRequest](a).
 		Post("/air/partial_offer_requests", &requestInput).
-		Single(ctx)
+		WithParams(supplierTimeout(requestInput.SupplierTimeout)).
+		WithOptions(opts...).Single(ctx)
 }
 
-func (a *API) GetPartialOfferRequests(ctx context.Context, requestInput PartialOfferRequestInput) (
+func (a *API) GetPartialOfferRequests(ctx context.Context, requestInput PartialOfferRequestInput, opts ...RequestOption) (
 	*OfferRequest, error,
 ) {
 	return newRequestWithAPI[PartialOfferRequestInput, OfferRequest](a).
 		Getf("/air/partial_offer_requests/%s", requestInput.PartialOfferRequestID).
 		WithParams(requestInput).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
-func (a *API) GetFullPartialOfferRequest(ctx context.Context, requestInput PartialOfferRequestInput) (
+func (a *API) GetFullPartialOfferRequest(ctx context.Context, requestInput PartialOfferRequestInput, opts ...RequestOption) (
 	*OfferRequest, error,
 ) {
 	return newRequestWithAPI[PartialOfferRequestInput, OfferRequest](a).
 		Getf("/air/partial_offer_requests/%s/fares", requestInput.PartialOfferRequestID).
 		WithParams(requestInput).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
-func (a *API) GetOfferRequest(ctx context.Context, id string) (*OfferRequest, error) {
-	return newRequestWithAPI[EmptyPayload, OfferRequest](a).Getf("/air/offer_requests/%s", id).Single(ctx)
+func (a *API) GetOfferRequest(ctx context.Context, id string, opts ...RequestOption) (*OfferRequest, error) {
+	return newRequestWithAPI[EmptyPayload, OfferRequest](a).Getf("/air/offer_requests/%s", id).WithOptions(opts...).Single(ctx)
 }
 
-func (a *API) ListOfferRequests(ctx context.Context) *Iter[OfferRequest] {
-	return newRequestWithAPI[EmptyPayload, OfferRequest](a).Get("/air/offer_requests").Iter(ctx)
+func (a *API) ListOfferRequests(ctx context.Context, opts ...RequestOption) *Iter[OfferRequest] {
+	return newRequestWithAPI[EmptyPayload, OfferRequest](a).Get("/air/offer_requests").WithOptions(opts...).Iter(ctx)
 }
 
 // Encode implements the ParamEncoder interface.
 func (o OfferRequestInput) Encode(q url.Values) error {
 	q.Set("return_offers", strconv.FormatBool(o.ReturnOffers))
+	return supplierTimeout(o.SupplierTimeout).Encode(q)
+}
+
+// supplierTimeout encodes supplier_timeout alone, for endpoints that do not take return_offers.
+type supplierTimeout int
+
+func (s supplierTimeout) Encode(q url.Values) error {
+	if s > 0 {
+		q.Set("supplier_timeout", strconv.Itoa(int(s)))
+	}
 	return nil
 }
 

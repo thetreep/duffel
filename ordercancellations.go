@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/bojanz/currency"
 )
@@ -16,6 +17,7 @@ import (
 const orderCancellationIDPrefix = "ore_"
 
 type (
+	// OrderCancellation times are RFC 3339 strings, parsed by the *AtTime accessors.
 	OrderCancellation struct {
 		ID                string          `json:"id"`
 		OrderID           string          `json:"order_id"`
@@ -57,48 +59,48 @@ type (
 	}
 
 	OrderCancellationClient interface {
-		CreateOrderCancellation(ctx context.Context, orderID string) (*OrderCancellation, error)
-		ConfirmOrderCancellation(ctx context.Context, orderCancellationID string) (*OrderCancellation, error)
-		GetOrderCancellation(ctx context.Context, orderCancellationID string) (*OrderCancellation, error)
+		CreateOrderCancellation(ctx context.Context, orderID string, opts ...RequestOption) (*OrderCancellation, error)
+		ConfirmOrderCancellation(ctx context.Context, orderCancellationID string, opts ...RequestOption) (*OrderCancellation, error)
+		GetOrderCancellation(ctx context.Context, orderCancellationID string, opts ...RequestOption) (*OrderCancellation, error)
 		ListOrderCancellations(ctx context.Context, params ...ListOrderCancellationParams) *Iter[OrderCancellation]
 	}
 )
 
 // CreateOrderCancellation creates a new pending order cancellation.
-func (a *API) CreateOrderCancellation(ctx context.Context, orderID string) (*OrderCancellation, error) {
+func (a *API) CreateOrderCancellation(ctx context.Context, orderID string, opts ...RequestOption) (*OrderCancellation, error) {
 	return newRequestWithAPI[OrderCancellationRequest, OrderCancellation](a).
 		Post(
 			"/air/order_cancellations", &OrderCancellationRequest{
 				OrderID: orderID,
 			},
 		).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
 // ConfirmOrderCancellation confirms a pending order cancellation.
-func (a *API) ConfirmOrderCancellation(ctx context.Context, orderCancellationID string) (*OrderCancellation, error) {
+func (a *API) ConfirmOrderCancellation(ctx context.Context, orderCancellationID string, opts ...RequestOption) (*OrderCancellation, error) {
 	if !strings.HasPrefix(orderCancellationID, orderCancellationIDPrefix) {
 		return nil, fmt.Errorf(
-			"orderCancellationID should have prefix %s, got %s", orderCancellationIDPrefix, orderCancellationID[:4],
+			"orderCancellationID should have prefix %s, got %q", orderCancellationIDPrefix, orderCancellationID,
 		)
 	}
 
 	return newRequestWithAPI[EmptyPayload, OrderCancellation](a).
 		Post(fmt.Sprintf("/air/order_cancellations/%s/actions/confirm", orderCancellationID), nil).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
 // GetOrderCancellation retrieves an order cancellation by its ID.
-func (a *API) GetOrderCancellation(ctx context.Context, orderCancellationID string) (*OrderCancellation, error) {
+func (a *API) GetOrderCancellation(ctx context.Context, orderCancellationID string, opts ...RequestOption) (*OrderCancellation, error) {
 	if !strings.HasPrefix(orderCancellationID, orderCancellationIDPrefix) {
 		return nil, fmt.Errorf(
-			"orderCancellationID should have prefix %s, got %s", orderCancellationIDPrefix, orderCancellationID[:4],
+			"orderCancellationID should have prefix %s, got %q", orderCancellationIDPrefix, orderCancellationID,
 		)
 	}
 
 	return newRequestWithAPI[EmptyPayload, OrderCancellation](a).
 		Getf("/air/order_cancellations/%s", orderCancellationID).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
 // ListOrderCancellations Retrieves a paginated list of order cancellations.
@@ -106,7 +108,7 @@ func (a *API) ListOrderCancellations(
 	ctx context.Context, params ...ListOrderCancellationParams,
 ) *Iter[OrderCancellation] {
 	return newRequestWithAPI[ListOrderCancellationParams, OrderCancellation](a).
-		Get("/air/orders").
+		Get("/air/order_cancellations").
 		WithParams(normalizeParams(params)...).
 		Iter(ctx)
 }
@@ -117,6 +119,18 @@ func (o *OrderCancellation) RefundAmount() currency.Amount {
 		return currency.Amount{}
 	}
 	return amount
+}
+
+func (o *OrderCancellation) ExpiresAtTime() (time.Time, bool) { return parseRFC3339(o.ExpiresAt) }
+
+func (o *OrderCancellation) CreatedAtTime() (time.Time, bool) { return parseRFC3339(o.CreatedAt) }
+
+// ConfirmedAtTime returns false while the cancellation is pending (confirmed_at is null).
+func (o *OrderCancellation) ConfirmedAtTime() (time.Time, bool) { return parseRFC3339(o.ConfirmedAt) }
+
+func parseRFC3339(v string) (time.Time, bool) {
+	t, err := time.Parse(time.RFC3339, v)
+	return t, err == nil
 }
 
 func (l ListOrderCancellationParams) Encode(v url.Values) error {

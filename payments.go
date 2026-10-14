@@ -33,7 +33,7 @@ type (
 	}
 
 	OrderPaymentClient interface {
-		CreatePayment(ctx context.Context, req CreatePaymentRequest) (*Payment, error)
+		CreatePayment(ctx context.Context, req CreatePaymentRequest, opts ...RequestOption) (*Payment, error)
 	}
 )
 
@@ -43,8 +43,8 @@ const (
 	PaymentTypeCard    = PaymentType("card")
 )
 
-func (a *API) CreatePayment(ctx context.Context, req CreatePaymentRequest) (*Payment, error) {
-	return newRequestWithAPI[CreatePaymentRequest, Payment](a).Post("/air/payments", &req).Single(ctx)
+func (a *API) CreatePayment(ctx context.Context, req CreatePaymentRequest, opts ...RequestOption) (*Payment, error) {
+	return newRequestWithAPI[CreatePaymentRequest, Payment](a).Post("/air/payments", &req).WithOptions(opts...).Single(ctx)
 }
 
 var _ OrderPaymentClient = (*API)(nil)

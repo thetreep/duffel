@@ -14,23 +14,23 @@ type (
 	}
 
 	LoyaltyProgrammeClient interface {
-		ListLoyaltyProgramme(ctx context.Context) *Iter[LoyaltyProgramme]
-		GetLoyaltyProgramme(ctx context.Context, id string) (*LoyaltyProgramme, error)
+		ListLoyaltyProgramme(ctx context.Context, opts ...RequestOption) *Iter[LoyaltyProgramme]
+		GetLoyaltyProgramme(ctx context.Context, id string, opts ...RequestOption) (*LoyaltyProgramme, error)
 	}
 )
 
 // ListLoyaltyProgramme retrieves a paginated list of loyalty programmes.
-func (a *API) ListLoyaltyProgramme(ctx context.Context) *Iter[LoyaltyProgramme] {
+func (a *API) ListLoyaltyProgramme(ctx context.Context, opts ...RequestOption) *Iter[LoyaltyProgramme] {
 	return newRequestWithAPI[EmptyPayload, LoyaltyProgramme](a).
 		Get("/air/loyalty_programmes").
-		Iter(ctx)
+		WithOptions(opts...).Iter(ctx)
 }
 
 // GetLoyaltyProgramme retrieves a loyalty programme by its ID.
-func (a *API) GetLoyaltyProgramme(ctx context.Context, id string) (*LoyaltyProgramme, error) {
+func (a *API) GetLoyaltyProgramme(ctx context.Context, id string, opts ...RequestOption) (*LoyaltyProgramme, error) {
 	return newRequestWithAPI[EmptyPayload, LoyaltyProgramme](a).
 		Getf("/air/loyalty_programmes/%s", id).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
 var _ LoyaltyProgrammeClient = (*API)(nil)

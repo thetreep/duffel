@@ -6,7 +6,10 @@ package duffel
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
+	"time"
 )
 
 type ErrorType string
@@ -195,46 +198,72 @@ const (
 	DuplicatePassengerNames ErrorCode = "duplicate_passenger_names"
 )
 
-// IsErrorCode is a concenience method to check if an error is a specific error code from Duffel.
-// This simplifies error handling branches without needing to type cast multiple times in your code.
+// IsErrorCode reports whether err, possibly wrapped, is a DuffelError with the given code.
 func IsErrorCode(err error, code ErrorCode) bool {
-	if err, ok := err.(*DuffelError); ok {
-		return err.IsCode(code)
-	}
-	return false
+	derr, ok := asDuffelError(err)
+	return ok && derr.IsCode(code)
 }
 
-// IsErrorType is a concenience method to check if an error is a specific error type from Duffel.
-// This simplifies error handling branches without needing to type cast multiple times in your code.
+// IsErrorType reports whether err, possibly wrapped, is a DuffelError with the given type.
 func IsErrorType(err error, typ ErrorType) bool {
-	if err, ok := err.(*DuffelError); ok {
-		return err.IsType(typ)
-	}
-	return false
+	derr, ok := asDuffelError(err)
+	return ok && derr.IsType(typ)
 }
 
-// RequestIDFromError returns the request ID from the error. Use this when contacting Duffel support
-// for non-retryable errors such as `AirlineInternal` or `AirlineUnknown`.
+// RequestIDFromError returns the request ID of a possibly wrapped *DuffelError or *DecodeError, for Duffel support.
 func RequestIDFromError(err error) (string, bool) {
-	if err, ok := err.(*DuffelError); ok {
-		return err.Meta.RequestID, true
+	if derr, ok := asDuffelError(err); ok {
+		return derr.Meta.RequestID, derr.Meta.RequestID != ""
+	}
+	if decErr, ok := errors.AsType[*DecodeError](err); ok {
+		return decErr.RequestID, decErr.RequestID != ""
 	}
 	return "", false
 }
 
 // ErrIsRetryable returns true if the request that generated this error is retryable.
+// It sees through wrapped errors.
 func ErrIsRetryable(err error) bool {
-	if err, ok := err.(*DuffelError); ok {
-		return err.Retryable
-	}
-	return false
+	derr, ok := asDuffelError(err)
+	return ok && derr.Retryable
 }
+
+func asDuffelError(err error) (*DuffelError, bool) {
+	if derr, ok := errors.AsType[*DuffelError](err); ok {
+		return derr, true
+	}
+	return nil, false
+}
+
+// ErrOrderAwaitingCreation is returned by CreateOrder with a partial *Order (no ID, Message set) on HTTP 200.
+// The booking may be paid: do not retry, recover the order later with a webhook or ListOrders.
+var ErrOrderAwaitingCreation = errors.New("duffel: order accepted, not created yet")
+
+// DecodeError means Duffel answered 2xx but the body was unreadable or empty.
+// The request may have had side effects such as a paid order, so it is not a transport failure.
+type DecodeError struct {
+	StatusCode int
+	RequestID  string
+	Err        error
+}
+
+func (e *DecodeError) Error() string { return "duffel: decode response: " + e.Err.Error() }
+
+func (e *DecodeError) Unwrap() error { return e.Err }
 
 type DuffelError struct {
 	Meta       ErrorMeta `json:"meta"`
 	Errors     []Error   `json:"errors"`
 	StatusCode int       `json:"-"`
 	Retryable  bool      `json:"-"`
+	// RetryAfter is the wait advised by the Ratelimit-Reset header on a 429, zero otherwise.
+	RetryAfter time.Duration `json:"-"`
+}
+
+func (e *DuffelError) fillRequestID(resp *http.Response) {
+	if e.Meta.RequestID == "" {
+		e.Meta.RequestID = resp.Header.Get(RequestIDHeader)
+	}
 }
 
 func (e *DuffelError) Error() string {

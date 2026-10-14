@@ -112,7 +112,7 @@ func (t Duration) String() string {
 }
 
 // UnmarshalGQL implements the graphql.Unmarshaler interface
-func (d *Duration) UnmarshalGQL(v interface{}) error {
+func (d *Duration) UnmarshalGQL(v any) error {
 	str, ok := v.(string)
 	if !ok {
 		return fmt.Errorf("invalid duration value: %v", v)

@@ -81,8 +81,8 @@ type (
 
 	SeatmapClient interface {
 		// GetSeatmap returns an iterator for the seatmaps of a given Offer.
-		GetSeatmap(ctx context.Context, offerID string) ([]*Seatmap, error)
-		SeatmapForOffer(ctx context.Context, offer Offer) ([]*Seatmap, error)
+		GetSeatmap(ctx context.Context, offerID string, opts ...RequestOption) ([]*Seatmap, error)
+		SeatmapForOffer(ctx context.Context, offer Offer, opts ...RequestOption) ([]*Seatmap, error)
 	}
 )
 
@@ -101,15 +101,15 @@ func (e ElementType) String() string {
 	return string(e)
 }
 
-func (a *API) SeatmapForOffer(ctx context.Context, offer Offer) ([]*Seatmap, error) {
-	return a.GetSeatmap(ctx, offer.ID)
+func (a *API) SeatmapForOffer(ctx context.Context, offer Offer, opts ...RequestOption) ([]*Seatmap, error) {
+	return a.GetSeatmap(ctx, offer.ID, opts...)
 }
 
-func (a *API) GetSeatmap(ctx context.Context, offerID string) ([]*Seatmap, error) {
+func (a *API) GetSeatmap(ctx context.Context, offerID string, opts ...RequestOption) ([]*Seatmap, error) {
 	return newRequestWithAPI[EmptyPayload, Seatmap](a).
 		Get("/air/seat_maps").
 		WithParam("offer_id", offerID).
-		Slice(ctx)
+		WithOptions(opts...).Slice(ctx)
 }
 
 func (s *SectionService) TotalAmount() currency.Amount {

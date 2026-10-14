@@ -49,10 +49,19 @@ func encodePayload[T any](requestInput T) (io.ReadCloser, error) {
 	return io.NopCloser(payload), nil
 }
 
+func newInternalClient[Req any, Resp any](a *API) *client[Req, Resp] {
+	return &client[Req, Resp]{api: a}
+}
+
 func (c *client[R, T]) makeRequest(
-	ctx context.Context, resourceName string, method string, body io.ReadCloser, opts ...RequestOption,
+	ctx context.Context, resourceName string, method string, input *R, opts ...RequestOption,
 ) (*http.Response, error) {
-	if c.APIToken == "" {
+	body, err := encodePayload(input)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.api.APIToken == "" {
 		return nil, fmt.Errorf("duffel: missing API token")
 	}
 
@@ -72,12 +81,12 @@ func (c *client[R, T]) makeRequest(
 
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
-	if !c.options.Debug {
+	if !c.api.options.Debug {
 		req.Header.Add("Accept-Encoding", "gzip")
 	}
-	req.Header.Add("User-Agent", c.options.UserAgent)
-	req.Header.Add("Duffel-Version", c.options.Version)
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.APIToken))
+	req.Header.Add("User-Agent", c.api.options.UserAgent)
+	req.Header.Add("Duffel-Version", c.api.options.Version)
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.api.APIToken))
 
 	// Apply request options
 	for _, o := range opts {
@@ -89,7 +98,7 @@ func (c *client[R, T]) makeRequest(
 		}
 	}
 
-	if c.options.Debug {
+	if c.api.options.Debug {
 		b, err := httputil.DumpRequestOut(req, true)
 		if err != nil {
 			return nil, err
@@ -97,12 +106,13 @@ func (c *client[R, T]) makeRequest(
 		fmt.Printf("REQUEST:\n%s\n", string(b))
 	}
 
-	resp, err := c.httpDoer.Do(req)
+	resp, err := c.api.httpDoer.Do(req)
 	if err != nil {
 		return nil, err
 	}
+	rateLimit := c.api.recordResponse(resp)
 
-	if c.options.Debug {
+	if c.api.options.Debug {
 		b, err := httputil.DumpResponse(resp, true)
 		if err != nil {
 			return nil, err
@@ -111,15 +121,15 @@ func (c *client[R, T]) makeRequest(
 	}
 
 	if resp.StatusCode > 399 {
-		err = decodeError(resp)
-		return nil, err
+		defer resp.Body.Close()
+		return nil, decodeError(resp, rateLimit)
 	}
 
 	return resp, nil
 }
 
 func (c *client[R, T]) buildRequestURL(resourceName string) (*url.URL, error) {
-	u, err := url.Parse(c.options.Host)
+	u, err := url.Parse(c.api.options.Host)
 
 	if err != nil {
 		return nil, err
@@ -143,39 +153,36 @@ func gzipResponseReader(response *http.Response) (io.ReadCloser, error) {
 	return reader, nil
 }
 
-func decodeError(response *http.Response) error {
-	reader, err := gzipResponseReader(response)
-	if err != nil {
-		return err
+// decodeError always returns a *DuffelError with the status so an HTTP error never looks like a transport failure.
+func decodeError(response *http.Response, rateLimit *RateLimit) error {
+	derr := &DuffelError{
+		StatusCode: response.StatusCode,
+		Retryable: response.StatusCode == http.StatusServiceUnavailable ||
+			response.StatusCode == http.StatusGatewayTimeout ||
+			response.StatusCode == http.StatusTooManyRequests,
 	}
+	if response.StatusCode == http.StatusTooManyRequests && rateLimit != nil {
+		derr.RetryAfter = rateLimit.Period
+	}
+	defer derr.fillRequestID(response)
 
-	contentType := response.Header.Get("Content-Type")
-
-	retryable := response.StatusCode == http.StatusServiceUnavailable ||
-		response.StatusCode == http.StatusGatewayTimeout
-
-	if strings.HasPrefix(contentType, "text/html") {
-		return &DuffelError{
-			StatusCode: response.StatusCode,
-			Retryable:  retryable,
-			Errors: []Error{
-				{
-					Type:    ApiError,
-					Title:   http.StatusText(response.StatusCode),
-					Message: "An internal server error occurred. Please try again later.",
-					Code:    InternalServerError,
-				},
-			},
+	if !strings.HasPrefix(response.Header.Get("Content-Type"), "text/html") {
+		if reader, err := gzipResponseReader(response); err == nil {
+			if json.NewDecoder(reader).Decode(derr) == nil && len(derr.Errors) > 0 {
+				return derr
+			}
 		}
 	}
 
-	derr := &DuffelError{
-		StatusCode: response.StatusCode,
-		Retryable:  retryable,
+	fallback := Error{Type: ApiError, Title: http.StatusText(response.StatusCode)}
+	switch {
+	case response.StatusCode == http.StatusTooManyRequests:
+		fallback.Type, fallback.Code, fallback.Message = RateLimitError, RateLimitExceeded, "Rate limit exceeded."
+	case response.StatusCode < 500:
+		fallback.Message = fmt.Sprintf("HTTP %d without a Duffel error body.", response.StatusCode)
+	default:
+		fallback.Code, fallback.Message = InternalServerError, "An internal server error occurred. Please try again later."
 	}
-	err = json.NewDecoder(reader).Decode(derr)
-	if err != nil {
-		return err
-	}
+	derr.Errors = []Error{fallback}
 	return derr
 }

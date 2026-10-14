@@ -156,7 +156,7 @@ func createOfferRequest(c *cli.Context) error {
 	}
 
 	passengers := []duffel.OfferRequestPassenger{}
-	for i := 0; i < adultsCount; i++ {
+	for range adultsCount {
 		passengers = append(
 			passengers, duffel.OfferRequestPassenger{
 				Type: duffel.PassengerTypeAdult,
@@ -212,7 +212,8 @@ func listOfferRequests(c *cli.Context) error {
 
 		for _, slice := range req.Slices {
 			fmt.Printf(
-				"   > %s to %s on %s\n", slice.Origin.IATACode, slice.Destination.IATACode, slice.DepartureDate.String(),
+				"   > %s to %s on %s\n", slice.Origin.IATACode, slice.Destination.IATACode,
+				slice.DepartureDate.String(),
 			)
 		}
 	}

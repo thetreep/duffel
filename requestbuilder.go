@@ -7,6 +7,7 @@ package duffel
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -77,6 +78,14 @@ func WithURLParams[T any](params ...T) RequestOption {
 			}
 		}
 		req.URL.RawQuery = q.Encode()
+		return nil
+	}
+}
+
+// WithHeader sets a header on a single request, for example x-duffel-device-ip on CreateOrder.
+func WithHeader(key, value string) RequestOption {
+	return func(req *http.Request) error {
+		req.Header.Set(key, value)
 		return nil
 	}
 }
@@ -155,9 +164,7 @@ func (r *RequestBuilder[Req, Resp]) Post(path string, body *Req, opts ...Request
 }
 
 func (r *RequestBuilder[Req, Resp]) Postf(path string, a ...any) *RequestBuilder[Req, Resp] {
-	r.method = http.MethodPost
-	r.resourcePath = fmt.Sprintf(path, a...)
-	return r
+	return r.Post(fmt.Sprintf(path, a...), r.body)
 }
 
 func (r *RequestBuilder[Req, Resp]) Body(body *Req) *RequestBuilder[Req, Resp] {
@@ -178,7 +185,7 @@ func (r *RequestBuilder[Req, Resp]) Patch(path string, body *Req, opts ...Reques
 func (r *RequestBuilder[Req, Resp]) Iter(ctx context.Context) *Iter[Resp] {
 	return GetIter(
 		func(lastMeta *ListMeta) (*List[Resp], error) {
-			ctx, cancel := context.WithDeadline(ctx, time.Now().Add(r.client.options.Timeout))
+			ctx, cancel := context.WithDeadline(ctx, time.Now().Add(r.client.api.options.Timeout))
 			defer cancel()
 
 			list := new(List[Resp])
@@ -190,7 +197,7 @@ func (r *RequestBuilder[Req, Resp]) Iter(ctx context.Context) *Iter[Resp] {
 			container := new(ResponsePayload[[]*Resp])
 			err = decodeResponse(response, &container)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to decode response")
+				return nil, err
 			}
 
 			list.SetListMeta(container.Meta)
@@ -201,10 +208,26 @@ func (r *RequestBuilder[Req, Resp]) Iter(ctx context.Context) *Iter[Resp] {
 	)
 }
 
+// waitRateLimit blocks for the wait advised by a 429 and reports whether the request should be retried.
+func waitRateLimit(ctx context.Context, err error) bool {
+	derr, ok := asDuffelError(err)
+	if !ok || derr.StatusCode != http.StatusTooManyRequests {
+		return false
+	}
+	timer := time.NewTimer(max(derr.RetryAfter, time.Second))
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
+}
+
 // Slice finalizes the request and returns the first page of items as a slice along with the error.
 // This is only needed for endpoints without pagination, such as place suggestions.
 func (r *RequestBuilder[Req, Resp]) Slice(ctx context.Context) ([]*Resp, error) {
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(r.client.options.Timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(r.client.api.options.Timeout))
 	defer cancel()
 
 	response, err := r.makeRequest(ctx)
@@ -215,7 +238,7 @@ func (r *RequestBuilder[Req, Resp]) Slice(ctx context.Context) ([]*Resp, error) 
 	container := new(ResponsePayload[[]*Resp])
 	err = decodeResponse(response, &container)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode response")
+		return nil, err
 	}
 
 	return container.Data, nil
@@ -229,7 +252,7 @@ func (r *RequestBuilder[Req, Resp]) Single(ctx context.Context) (*Resp, error) {
 
 // SingleWithResponse finalizes the request and returns the decoded response along with the HTTP status code.
 func (r *RequestBuilder[Req, Resp]) SingleWithResponse(ctx context.Context) (*Resp, int, error) {
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(r.client.options.Timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(r.client.api.options.Timeout))
 	defer cancel()
 
 	response, err := r.makeRequest(ctx)
@@ -238,8 +261,11 @@ func (r *RequestBuilder[Req, Resp]) SingleWithResponse(ctx context.Context) (*Re
 	}
 	container := new(ResponsePayload[*Resp])
 	err = decodeResponse(response, &container)
+	if err == nil && container.Data == nil {
+		err = &DecodeError{StatusCode: response.StatusCode, RequestID: response.Header.Get(RequestIDHeader), Err: errors.New("response has no data")}
+	}
 	if err != nil {
-		return nil, 0, errors.Wrap(err, "failed to decode response")
+		return nil, response.StatusCode, err
 	}
 
 	return container.Data, response.StatusCode, nil
@@ -248,29 +274,43 @@ func (r *RequestBuilder[Req, Resp]) SingleWithResponse(ctx context.Context) (*Re
 // Empty finalizes the request and returns an error if the request fails.
 // It is to be used for requests that are expected to return no data.
 func (r *RequestBuilder[Req, Resp]) Empty(ctx context.Context) error {
-	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(r.client.options.Timeout))
+	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(r.client.api.options.Timeout))
 	defer cancel()
 
-	_, err := r.makeRequest(ctx)
+	response, err := r.makeRequest(ctx)
 	if err != nil {
 		return err
 	}
 
-	return nil
+	_, _ = io.Copy(io.Discard, response.Body)
+	return response.Body.Close()
 }
 
+// makeRequest retries a 429 on GET only: a replayed POST could book or charge twice.
 func (r *RequestBuilder[Req, Resp]) makeRequest(ctx context.Context, opts ...RequestOption) (*http.Response, error) {
-	return r.client.Do(ctx, r.resourcePath, r.method, r.body, append(r.requestOptions, opts...)...)
+	opts = append(r.requestOptions, opts...)
+	for attempt := 0; ; attempt++ {
+		resp, err := r.client.makeRequest(ctx, r.resourcePath, r.method, r.body, opts...)
+		if r.method != http.MethodGet || attempt == maxRateLimitRetries || !waitRateLimit(ctx, err) {
+			return resp, err
+		}
+	}
 }
 
-func decodeResponse[T any](resp *http.Response, v T) error {
-	reader, err := gzipResponseReader(resp)
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
+const maxRateLimitRetries = 3
 
-	return json.NewDecoder(reader).Decode(v)
+// decodeResponse returns *DecodeError on failure because the request did reach Duffel.
+func decodeResponse[T any](resp *http.Response, v T) error {
+	defer resp.Body.Close()
+
+	reader, err := gzipResponseReader(resp)
+	if err == nil {
+		err = json.NewDecoder(reader).Decode(v)
+	}
+	if err != nil {
+		return &DecodeError{StatusCode: resp.StatusCode, RequestID: resp.Header.Get(RequestIDHeader), Err: err}
+	}
+	return nil
 }
 
 // normalizeParams returns a slice of interfaces from the given params.

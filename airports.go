@@ -12,7 +12,7 @@ import (
 type (
 	AirportsClient interface {
 		ListAirports(ctx context.Context, params ...ListAirportsParams) *Iter[Airport]
-		GetAirport(ctx context.Context, id string) (*Airport, error)
+		GetAirport(ctx context.Context, id string, opts ...RequestOption) (*Airport, error)
 	}
 
 	ListAirportsParams struct {
@@ -27,10 +27,10 @@ func (a *API) ListAirports(ctx context.Context, params ...ListAirportsParams) *I
 		Iter(ctx)
 }
 
-func (a *API) GetAirport(ctx context.Context, id string) (*Airport, error) {
+func (a *API) GetAirport(ctx context.Context, id string, opts ...RequestOption) (*Airport, error) {
 	return newRequestWithAPI[EmptyPayload, Airport](a).
 		Getf("/air/airports/%s", id).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
 func (p ListAirportsParams) Encode(q url.Values) error {

@@ -6,11 +6,18 @@ package duffel
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"os"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/cockroachdb/errors"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
 
@@ -127,30 +134,201 @@ func TestClientErrorWithSource(t *testing.T) {
 	a.Equal("/slices/0/origin", derr.Errors[0].Source.Pointer)
 }
 
-func TestRateLimitPreemptionReturnsDuffelError(t *testing.T) {
-	defer gock.Off()
+// newTestClient points a real client at an httptest server, which unlike gock is safe for concurrent calls.
+func newTestClient(t *testing.T, h http.HandlerFunc) Duffel {
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	return New("duffel_test_123", WithHost(srv.URL))
+}
+
+func serveFixture(t *testing.T, status int, fixture string, headers map[string]string) http.HandlerFunc {
+	body, err := os.ReadFile(fixture)
+	require.NoError(t, err)
+	return func(w http.ResponseWriter, r *http.Request) {
+		for k, v := range headers {
+			w.Header().Set(k, v)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_, _ = w.Write(body)
+	}
+}
+
+func TestRateLimitRemainingZeroKeepsSuccessfulResponse(t *testing.T) {
 	a := assert.New(t)
+	client := newTestClient(
+		t, serveFixture(
+			t, http.StatusCreated, "fixtures/201-create-order.json", map[string]string{
+				"Ratelimit-Limit":     "30",
+				"Ratelimit-Remaining": "0",
+				"Ratelimit-Reset":     time.Now().Add(30 * time.Second).UTC().Format(time.RFC1123),
+			},
+		),
+	)
 
-	gock.New("https://api.duffel.com").
-		Get("/air/orders/ord_123").
-		Reply(200).
-		SetHeader("Ratelimit-Limit", "5").
-		SetHeader("Ratelimit-Remaining", "0").
-		SetHeader("Ratelimit-Reset", time.Now().Add(30*time.Second).Format(time.RFC1123)).
-		SetHeader("Date", time.Now().Format(time.RFC1123)).
-		File("fixtures/200-get-order.json")
+	order, err := client.CreateOrder(context.TODO(), CreateOrderInput{Type: OrderTypeInstant})
+	a.NoError(err)
+	a.Equal("ord_00009hthhsUZ8W4LxQgkjo", order.ID)
 
-	client := New("duffel_test_123")
-	_, err := client.GetOrder(context.TODO(), "ord_123")
+	rl, ok := client.LastRateLimit()
+	a.True(ok)
+	a.Equal(30, rl.Limit)
+	a.Equal(0, rl.Remaining)
+}
 
-	a.Error(err)
-	a.True(IsErrorType(err, RateLimitError))
+func TestMissingRateLimitHeadersKeepSuccessfulResponse(t *testing.T) {
+	a := assert.New(t)
+	client := newTestClient(t, serveFixture(t, http.StatusCreated, "fixtures/201-create-order.json", nil))
+
+	order, err := client.CreateOrder(context.TODO(), CreateOrderInput{Type: OrderTypeInstant})
+	a.NoError(err)
+	a.Equal("ord_00009hthhsUZ8W4LxQgkjo", order.ID)
+
+	_, ok := client.LastRateLimit()
+	a.False(ok)
+}
+
+func TestRealRateLimitIsRetryableButPostIsNotReplayed(t *testing.T) {
+	a := assert.New(t)
+	var calls atomic.Int32
+	client := newTestClient(
+		t, func(w http.ResponseWriter, r *http.Request) {
+			calls.Add(1)
+			w.Header().Set("Ratelimit-Limit", "30")
+			w.Header().Set("Ratelimit-Remaining", "0")
+			w.Header().Set("Ratelimit-Reset", time.Now().Add(20*time.Second).UTC().Format(time.RFC1123))
+			w.Header().Set(RequestIDHeader, "req_429")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"errors":[{"type":"rate_limit_error","code":"rate_limit_exceeded","message":"Too many requests"}]}`))
+		},
+	)
+
+	_, err := client.CreateOrder(context.TODO(), CreateOrderInput{})
+	a.EqualValues(1, calls.Load())
 	a.True(IsErrorCode(err, RateLimitExceeded))
 	a.True(ErrIsRetryable(err))
 
-	derr, ok := err.(*DuffelError)
-	a.True(ok)
+	var derr *DuffelError
+	a.ErrorAs(err, &derr)
 	a.Equal(http.StatusTooManyRequests, derr.StatusCode)
+	a.Greater(derr.RetryAfter, 10*time.Second)
+	a.Equal("req_429", derr.Meta.RequestID)
+}
+
+func TestNonJSONErrorBodyKeepsStatus(t *testing.T) {
+	a := assert.New(t)
+	client := newTestClient(
+		t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte("slow down"))
+		},
+	)
+
+	_, err := client.CreateOrder(context.TODO(), CreateOrderInput{})
+	var derr *DuffelError
+	a.ErrorAs(err, &derr)
+	a.Equal(http.StatusTooManyRequests, derr.StatusCode)
+	a.True(derr.Retryable)
+	a.True(derr.IsCode(RateLimitExceeded))
+}
+
+func TestDecodeErrorAfterSuccess(t *testing.T) {
+	a := assert.New(t)
+	client := newTestClient(
+		t, func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(RequestIDHeader, "req_bad_body")
+			w.WriteHeader(http.StatusCreated)
+			_, _ = w.Write([]byte("{not json"))
+		},
+	)
+
+	_, err := client.CreateOrder(context.TODO(), CreateOrderInput{Type: OrderTypeInstant})
+	var decErr *DecodeError
+	a.ErrorAs(err, &decErr)
+	a.Equal(http.StatusCreated, decErr.StatusCode)
+	a.Equal("req_bad_body", decErr.RequestID)
+	a.False(ErrIsRetryable(err))
+
+	id, ok := RequestIDFromError(err)
+	a.True(ok)
+	a.Equal("req_bad_body", id)
+
+	// Iter wraps the error, errors.As must still find it.
+	iter := client.ListOrders(context.TODO())
+	a.False(iter.Next())
+	a.ErrorAs(iter.Err(), &decErr)
+}
+
+func TestErrorHelpersSeeThroughWrapping(t *testing.T) {
+	a := assert.New(t)
+	base := &DuffelError{
+		Meta:      ErrorMeta{RequestID: "req_1"},
+		Errors:    []Error{{Type: InvalidStateError, Code: OfferNoLongerAvailable}},
+		Retryable: true,
+	}
+
+	for _, err := range []error{base, errors.Wrap(base, "adapter"), fmt.Errorf("adapter: %w", base)} {
+		a.True(IsErrorCode(err, OfferNoLongerAvailable))
+		a.True(IsErrorType(err, InvalidStateError))
+		a.True(ErrIsRetryable(err))
+		id, ok := RequestIDFromError(err)
+		a.True(ok)
+		a.Equal("req_1", id)
+	}
+
+	a.False(IsErrorCode(fmt.Errorf("plain"), OfferNoLongerAvailable))
+	_, ok := RequestIDFromError(fmt.Errorf("plain"))
+	a.False(ok)
+}
+
+func TestConcurrentCallsShareOneClient(t *testing.T) {
+	var calls atomic.Int32
+	client := newTestClient(
+		t, func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set(RequestIDHeader, fmt.Sprintf("req_%d", calls.Add(1)))
+			w.Header().Set("Ratelimit-Limit", "120")
+			w.Header().Set("Ratelimit-Remaining", "60")
+			w.Header().Set("Ratelimit-Reset", time.Now().Add(time.Minute).UTC().Format(time.RFC1123))
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"data":{"id":"ord_1"}}`))
+		},
+	)
+
+	var wg sync.WaitGroup
+	for range 50 {
+		wg.Go(
+			func() {
+				order, err := client.GetOrder(context.TODO(), "ord_1")
+				assert.NoError(t, err)
+				assert.Equal(t, "ord_1", order.ID)
+				client.LastRequestID()
+				client.LastRateLimit()
+			},
+		)
+	}
+	wg.Wait()
+
+	assert.EqualValues(t, 50, calls.Load())
+	_, ok := client.LastRequestID()
+	assert.True(t, ok)
+}
+
+func TestWithHeaderOnCreateOrder(t *testing.T) {
+	a := assert.New(t)
+	var got string
+	client := newTestClient(
+		t, func(w http.ResponseWriter, r *http.Request) {
+			got = r.Header.Get("x-duffel-device-ip")
+			serveFixture(t, http.StatusCreated, "fixtures/201-create-order.json", nil)(w, r)
+		},
+	)
+
+	_, err := client.CreateOrder(
+		context.TODO(), CreateOrderInput{Type: OrderTypeInstant}, WithHeader("x-duffel-device-ip", "203.0.113.5"),
+	)
+	a.NoError(err)
+	a.Equal("203.0.113.5", got)
 }
 
 func TestDefaultTimeoutIs130Seconds(t *testing.T) {
@@ -165,4 +343,74 @@ func TestCustomTimeout(t *testing.T) {
 	client := New("duffel_test_123", WithTimeout(60*time.Second))
 	api := client.(*API)
 	a.Equal(60*time.Second, api.options.Timeout)
+}
+
+func TestCreateOrderAppliesOptionsOnce(t *testing.T) {
+	a := assert.New(t)
+	var query string
+	client := newTestClient(
+		t, func(w http.ResponseWriter, r *http.Request) {
+			query = r.URL.RawQuery
+			serveFixture(t, http.StatusCreated, "fixtures/201-create-order.json", nil)(w, r)
+		},
+	)
+
+	_, err := client.CreateOrder(context.TODO(), CreateOrderInput{}, WithURLParam("x", "1"))
+	a.NoError(err)
+	a.Equal("x=1", query)
+}
+
+func TestCreateOrderNullDataIsDecodeError(t *testing.T) {
+	a := assert.New(t)
+	client := newTestClient(
+		t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data":null}`))
+		},
+	)
+
+	order, err := client.CreateOrder(context.TODO(), CreateOrderInput{})
+	a.Nil(order)
+	var decErr *DecodeError
+	a.ErrorAs(err, &decErr)
+	a.Equal(http.StatusOK, decErr.StatusCode)
+}
+
+func TestProxyErrorBodiesAreNotServerErrors(t *testing.T) {
+	for _, body := range []string{"forbidden", `{"message":"Not Found"}`} {
+		client := newTestClient(
+			t, func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusForbidden)
+				_, _ = w.Write([]byte(body))
+			},
+		)
+
+		_, err := client.GetOrder(context.TODO(), "ord_1")
+		var derr *DuffelError
+		assert.ErrorAs(t, err, &derr)
+		assert.Equal(t, http.StatusForbidden, derr.StatusCode)
+		assert.False(t, derr.IsCode(InternalServerError))
+		assert.Equal(t, "duffel: HTTP 403 without a Duffel error body.", err.Error())
+	}
+}
+
+func TestIterRetriesRateLimitedPage(t *testing.T) {
+	a := assert.New(t)
+	var calls atomic.Int32
+	client := newTestClient(
+		t, func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			if calls.Add(1) == 1 {
+				w.WriteHeader(http.StatusTooManyRequests)
+				_, _ = w.Write([]byte(`{"errors":[{"type":"rate_limit_error","code":"rate_limit_exceeded"}]}`))
+				return
+			}
+			_, _ = w.Write([]byte(`{"data":[{"id":"ord_1"}],"meta":{}}`))
+		},
+	)
+
+	orders, err := Collect(client.ListOrders(context.TODO()))
+	a.NoError(err)
+	a.Len(orders, 1)
+	a.EqualValues(2, calls.Load())
 }

@@ -6,6 +6,8 @@ package duffel
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"testing"
 	"time"
 
@@ -128,4 +130,43 @@ func TestListOfferRequests(t *testing.T) {
 	a.NotNil(data)
 	a.Equal("arp_jfk_us", data.Slices[0].Origin.ID)
 	a.Equal("cit_aus_us", data.Slices[0].Destination.ID)
+}
+
+func TestSupplierTimeoutQueryParam(t *testing.T) {
+	a := assert.New(t)
+	var queries []string
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		queries = append(queries, r.URL.Path+"?"+r.URL.RawQuery)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_, _ = w.Write([]byte(`{"data":{"id":"orq_1"}}`))
+	})
+
+	_, err := client.CreateOfferRequest(context.TODO(), OfferRequestInput{SupplierTimeout: 5000})
+	a.NoError(err)
+	_, err = client.CreateOfferRequest(context.TODO(), OfferRequestInput{})
+	a.NoError(err)
+	_, err = client.CreatePartialOfferRequest(context.TODO(), OfferRequestInput{SupplierTimeout: 5000})
+	a.NoError(err)
+
+	a.Equal([]string{
+		"/air/offer_requests?return_offers=false&supplier_timeout=5000",
+		"/air/offer_requests?return_offers=false",
+		"/air/partial_offer_requests?supplier_timeout=5000",
+	}, queries)
+}
+
+func TestOfferRequestSliceTimeWindows(t *testing.T) {
+	a := assert.New(t)
+	date, err := time.Parse(time.DateOnly, "2026-11-01")
+	a.NoError(err)
+
+	b, err := json.Marshal(OfferRequestSlice{
+		DepartureDate: Date(date),
+		Origin:        "CDG",
+		Destination:   "NCE",
+		DepartureTime: &TimeWindow{From: "08:00", To: "12:00"},
+	})
+	a.NoError(err)
+	a.JSONEq(`{"departure_date":"2026-11-01","origin":"CDG","destination":"NCE","departure_time":{"from":"08:00","to":"12:00"}}`, string(b))
 }

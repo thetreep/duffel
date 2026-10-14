@@ -6,6 +6,8 @@ package duffel
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"testing"
 	"time"
 
@@ -79,4 +81,47 @@ func TestGetOrderCancellation(t *testing.T) {
 	a.NoError(err)
 	a.NotNil(data)
 	a.Equal("90.80 GBP", data.RefundAmount().String())
+}
+
+func TestListOrderCancellationsPath(t *testing.T) {
+	a := assert.New(t)
+	var got string
+	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		got = r.URL.Path + "?" + r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"id":"ore_1","order_id":"ord_1"}],"meta":{}}`))
+	})
+
+	items, err := Collect(client.ListOrderCancellations(context.TODO(), ListOrderCancellationParams{OrderID: "ord_1"}))
+	a.NoError(err)
+	a.Len(items, 1)
+	a.Equal("ore_1", items[0].ID)
+	a.Equal("/air/order_cancellations?order_id=ord_1", got)
+}
+
+func TestOrderCancellationShortIDsDoNotPanic(t *testing.T) {
+	client := New("duffel_test_123")
+	for _, id := range []string{"", "ab", "ord_123"} {
+		_, err := client.ConfirmOrderCancellation(context.TODO(), id)
+		assert.Error(t, err)
+		_, err = client.GetOrderCancellation(context.TODO(), id)
+		assert.Error(t, err)
+	}
+}
+
+func TestOrderCancellationTimeAccessors(t *testing.T) {
+	a := assert.New(t)
+	var oc OrderCancellation
+	a.NoError(json.Unmarshal([]byte(`{"expires_at":"2020-01-17T10:42:14Z","created_at":"2020-04-11T15:48:11.642Z","confirmed_at":null}`), &oc))
+
+	expires, ok := oc.ExpiresAtTime()
+	a.True(ok)
+	a.Equal(time.Date(2020, 1, 17, 10, 42, 14, 0, time.UTC), expires)
+
+	created, ok := oc.CreatedAtTime()
+	a.True(ok)
+	a.Equal(642*time.Millisecond, time.Duration(created.Nanosecond()))
+
+	_, ok = oc.ConfirmedAtTime()
+	a.False(ok)
 }

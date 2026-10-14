@@ -29,12 +29,12 @@ type (
 	}
 
 	PaymentCard struct {
+		UnavailableAt DateTime         `json:"unavailable_at"`
 		ID            string           `json:"id"`
-		LiveMode      bool             `json:"live_mode"`
 		Last4Digits   string           `json:"last_4_digits"`
-		MultiUse      bool             `json:"multi_use"`
 		Brand         PaymentCardBrand `json:"brand"`
-		UnavailableAt DateTime         `json:"unavailable_at,omitempty"`
+		LiveMode      bool             `json:"live_mode"`
+		MultiUse      bool             `json:"multi_use"`
 	}
 
 	PaymentCardBrand string
@@ -42,11 +42,13 @@ type (
 	PaymentCardClient interface {
 		CreatePaymentCardRecord(
 			ctx context.Context, payload *CreatePaymentCardRecordRequest,
+			opts ...RequestOption,
 		) (*PaymentCard, error)
 		CreateTemporaryPaymentCardRecordFromSavedPaymentCardRecord(
 			ctx context.Context, payload *CreateTemporaryPaymentCardRecordFromSavedPaymentCardRequest,
+			opts ...RequestOption,
 		) (*PaymentCard, error)
-		DeleteSavedPaymentCardRecord(ctx context.Context, id string) error
+		DeleteSavedPaymentCardRecord(ctx context.Context, id string, opts ...RequestOption) error
 	}
 )
 
@@ -61,24 +63,26 @@ const (
 
 func (a *API) CreatePaymentCardRecord(
 	ctx context.Context, payload *CreatePaymentCardRecordRequest,
+	opts ...RequestOption,
 ) (*PaymentCard, error) {
 	return newRequestWithAPI[CreatePaymentCardRecordRequest, PaymentCard](a).
 		Post("/vault/cards", payload).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
 func (a *API) CreateTemporaryPaymentCardRecordFromSavedPaymentCardRecord(
 	ctx context.Context, payload *CreateTemporaryPaymentCardRecordFromSavedPaymentCardRequest,
+	opts ...RequestOption,
 ) (*PaymentCard, error) {
 	return newRequestWithAPI[CreateTemporaryPaymentCardRecordFromSavedPaymentCardRequest, PaymentCard](a).
 		Post("/vault/cards", payload).
-		Single(ctx)
+		WithOptions(opts...).Single(ctx)
 }
 
-func (a *API) DeleteSavedPaymentCardRecord(ctx context.Context, id string) error {
+func (a *API) DeleteSavedPaymentCardRecord(ctx context.Context, id string, opts ...RequestOption) error {
 	return newRequestWithAPI[EmptyPayload, EmptyPayload](a).
 		Deletef("/vault/cards/%s", id).
-		Empty(ctx)
+		WithOptions(opts...).Empty(ctx)
 }
 
 var _ AircraftClient = (*API)(nil)
