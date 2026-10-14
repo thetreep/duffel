@@ -1,18 +1,6 @@
 module github.com/thetreep/duffel/v2
 
-go 1.22.4
-
-require (
-	github.com/bojanz/currency v1.2.3
-	github.com/gorilla/schema v1.4.1
-	github.com/jedib0t/go-pretty/v6 v6.4.6
-	github.com/pkg/errors v0.9.1 // indirect
-	github.com/rickb777/date v1.21.1
-	github.com/stretchr/testify v1.8.4
-	github.com/urfave/cli/v2 v2.25.7
-	golang.org/x/time v0.7.0
-	gopkg.in/h2non/gock.v1 v1.1.2
-)
+go 1.27.1
 
 require (
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
@@ -28,6 +16,7 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rickb777/plural v1.4.2 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
@@ -41,8 +30,16 @@ require (
 )
 
 require (
+	github.com/bojanz/currency v1.2.3
 	github.com/cockroachdb/errors v1.11.3
 	github.com/fatih/color v1.15.0
 	github.com/gocarina/gocsv v0.0.0-20230616125104-99d496ca653d
+	github.com/gorilla/schema v1.4.1
+	github.com/jedib0t/go-pretty/v6 v6.4.6
+	github.com/rickb777/date v1.21.1
 	github.com/segmentio/encoding v0.4.0
+	github.com/stretchr/testify v1.8.4
+	github.com/urfave/cli/v2 v2.25.7
+	golang.org/x/time v0.7.0
+	gopkg.in/h2non/gock.v1 v1.1.2
 )
