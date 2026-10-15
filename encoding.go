@@ -71,6 +71,8 @@ var timeFormats = []string{
 	"2006-01-02",
 	time.RFC3339,
 	time.RFC3339Nano,
+	// Webhook resources use a space separator in the spec examples.
+	"2006-01-02 15:04:05.999999999Z07:00",
 }
 
 // UnmarshalJSON implements the json.Unmarshaler from date string to time.Time

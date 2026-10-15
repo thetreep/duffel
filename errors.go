@@ -25,6 +25,8 @@ const (
 	ValidationError     ErrorType = "validation_error"
 	InvalidRequestError ErrorType = "invalid_request_error"
 	ApiError            ErrorType = "api_error"
+	// FraudError is opt-in while in preview. Never retry it.
+	FraudError ErrorType = "fraud_error"
 
 	// The access token used is not recognized by our system
 	AccessTokenNotFound ErrorCode = "access_token_not_found"
@@ -196,6 +198,18 @@ const (
 
 	// The order contains passengers with duplicate names
 	DuplicatePassengerNames ErrorCode = "duplicate_passenger_names"
+
+	// The request was assessed as high fraud risk. The rejection is final
+	HighFraudRisk ErrorCode = "high_fraud_risk"
+
+	// The order has already been paid for
+	AlreadyPaid ErrorCode = "already_paid"
+
+	// The order's payment_required_by date has elapsed
+	PastPaymentRequiredByDate ErrorCode = "past_payment_required_by_date"
+
+	// The order changed on the airline's side and cannot be paid, create a new order
+	ScheduleChanged ErrorCode = "schedule_changed"
 )
 
 // IsErrorCode reports whether err, possibly wrapped, is a DuffelError with the given code.

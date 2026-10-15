@@ -181,6 +181,15 @@ func (r *RequestBuilder[Req, Resp]) Patch(path string, body *Req, opts ...Reques
 	return r
 }
 
+// Put sets the request method to PUT, the request path to the given path, and the request payload to body.
+func (r *RequestBuilder[Req, Resp]) Put(path string, body *Req, opts ...RequestOption) *RequestBuilder[Req, Resp] {
+	r.method = http.MethodPut
+	r.resourcePath = path
+	r.requestOptions = append(r.requestOptions, opts...)
+	r.body = body
+	return r
+}
+
 // Iter finalizes the request and returns an iterator over the response.
 func (r *RequestBuilder[Req, Resp]) Iter(ctx context.Context) *Iter[Resp] {
 	return GetIter(

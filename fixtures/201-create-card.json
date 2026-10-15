@@ -1,0 +1,11 @@
+{
+  "data": {
+    "brand": "mastercard",
+    "id": "tcd_00009hthhsUZ8W4LxQgkjb",
+    "last_4_digits": "1234",
+    "live_mode": true,
+    "multi_use": false,
+    "name": "John Doe",
+    "unavailable_at": "2023-04-13T15:48:11.642Z"
+  }
+}

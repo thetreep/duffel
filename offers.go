@@ -25,6 +25,8 @@ type (
 		) (*OfferRequestPassenger, error)
 		ListOffers(ctx context.Context, reqId string, options ...ListOffersParams) *Iter[Offer]
 		GetOffer(ctx context.Context, id string, params ...GetOfferParams) (*Offer, error)
+		PriceOffer(ctx context.Context, offerID string, input PriceOfferInput, opts ...RequestOption) (*Offer, error)
+		GetUpsellOffers(ctx context.Context, offerID string, opts ...RequestOption) ([]*Offer, error)
 	}
 
 	Offer struct {
@@ -51,7 +53,82 @@ type (
 		Conditions                              Conditions              `json:"conditions"`
 		PrivateFares                            []OfferPrivateFare      `json:"private_fares"`
 		SupportedLoyaltyProgrammes              []string                `json:"supported_loyalty_programmes"` // Airline IATA codes (e.g. ["BA", "U2"])
+		AvailableAirlineCreditIDs               []string                `json:"available_airline_credit_ids,omitempty"`
+		IntendedPaymentMethods                  []IntendedPaymentMethod `json:"intended_payment_methods,omitempty"`
+		IntendedServices                        []ServiceCreateInput    `json:"intended_services,omitempty"`
+		// TaxBreakdown is only returned by GetOffer.
+		TaxBreakdown []TaxBreakdownItem `json:"tax_breakdown,omitempty"`
 	}
+
+	// IntendedPaymentMethod is a priced payment method: card fields for type card, airline credit fields for type airline_credit.
+	IntendedPaymentMethod struct {
+		Type                 IntendedPaymentMethodType `json:"type"`
+		CardID               string                    `json:"card_id,omitempty"`
+		AirlineCreditID      string                    `json:"airline_credit_id,omitempty"`
+		RawChargeAmount      string                    `json:"charge_amount"`
+		RawChargeCurrency    string                    `json:"charge_currency"`
+		RawSurchargeAmount   *string                   `json:"surcharge_amount,omitempty"`
+		RawSurchargeCurrency *string                   `json:"surcharge_currency,omitempty"`
+		RawPenaltyAmount     *string                   `json:"penalty_amount,omitempty"`
+		RawPenaltyCurrency   *string                   `json:"penalty_currency,omitempty"`
+	}
+
+	IntendedPaymentMethodType string
+
+	// IntendedPaymentMethodInput sets CardID for type card or AirlineCreditID for type airline_credit.
+	IntendedPaymentMethodInput struct {
+		Type            IntendedPaymentMethodType `json:"type"`
+		CardID          string                    `json:"card_id,omitempty"`
+		AirlineCreditID string                    `json:"airline_credit_id,omitempty"`
+	}
+
+	PriceOfferInput struct {
+		IntendedPaymentMethods []IntendedPaymentMethodInput `json:"intended_payment_methods"`
+		IntendedServices       []ServiceCreateInput         `json:"intended_services"`
+	}
+
+	TaxBreakdownItem struct {
+		// RawAmount is negative for a refundable tax.
+		RawAmount      string  `json:"amount"`
+		RawCurrency    string  `json:"currency"`
+		Code           string  `json:"code"`
+		CarrierImposed *bool   `json:"carrier_imposed"`
+		Description    *string `json:"description"`
+		Name           *string `json:"name"`
+	}
+
+	SegmentCabin struct {
+		Name          CabinClass      `json:"name"`
+		MarketingName string          `json:"marketing_name"`
+		Amenities     *CabinAmenities `json:"amenities,omitempty"`
+	}
+
+	CabinAmenities struct {
+		Wifi  *WifiAmenity  `json:"wifi,omitempty"`
+		Seat  *SeatAmenity  `json:"seat,omitempty"`
+		Power *PowerAmenity `json:"power,omitempty"`
+	}
+
+	WifiAmenity struct {
+		Available bool     `json:"available"`
+		Cost      WifiCost `json:"cost"`
+	}
+
+	SeatAmenity struct {
+		Legroom SeatLegroom `json:"legroom"`
+		Pitch   string      `json:"pitch"`
+		Type    SeatType    `json:"type,omitempty"`
+	}
+
+	PowerAmenity struct {
+		Available bool `json:"available"`
+	}
+
+	WifiCost string
+
+	SeatLegroom string
+
+	SeatType string
 
 	PrivateFareType string
 
@@ -81,10 +158,11 @@ type (
 
 	AvailableServiceMetadata struct {
 		// For a Baggage
-		MaximumDepthCM  int `json:"maximum_depth_cm,omitempty"`  // e.g. 30
-		MaximumHeightCM int `json:"maximum_height_cm,omitempty"` // e.g. 40
-		MaximumLengthCM int `json:"maximum_length_cm,omitempty"` // e.g. 55
-		MaximumWeightKg int `json:"maximum_weight_kg,omitempty"` // e.g. 23
+		// Duffel sends decimals or null for these.
+		MaximumDepthCM  *float64 `json:"maximum_depth_cm,omitempty"`  // e.g. 30
+		MaximumHeightCM *float64 `json:"maximum_height_cm,omitempty"` // e.g. 40
+		MaximumLengthCM *float64 `json:"maximum_length_cm,omitempty"` // e.g. 55
+		MaximumWeightKg *float64 `json:"maximum_weight_kg,omitempty"` // e.g. 23.5
 		// Possible values: "checked", "carry_on"
 		Type string `json:"type"`
 
@@ -157,7 +235,89 @@ const (
 	MealTypeAllergenMeal           MealType = "allergen_meal"
 	MealTypeVegetarianMeal         MealType = "vegetarian_meal"
 	MealTypeMeal                   MealType = "meal"
+
+	IntendedPaymentMethodCard          IntendedPaymentMethodType = "card"
+	IntendedPaymentMethodAirlineCredit IntendedPaymentMethodType = "airline_credit"
+
+	WifiCostFree       WifiCost = "free"
+	WifiCostFreeOrPaid WifiCost = "free or paid"
+	WifiCostPaid       WifiCost = "paid"
+	WifiCostNA         WifiCost = "n/a"
+
+	SeatLegroomLess     SeatLegroom = "less"
+	SeatLegroomMore     SeatLegroom = "more"
+	SeatLegroomStandard SeatLegroom = "standard"
+	SeatLegroomNA       SeatLegroom = "n/a"
+
+	SeatTypeStandard     SeatType = "standard"
+	SeatTypeSkycouch     SeatType = "skycouch"
+	SeatTypeRecliner     SeatType = "recliner"
+	SeatTypeAngleFlat    SeatType = "angle_flat"
+	SeatTypeFullFlat     SeatType = "full_flat"
+	SeatTypeFullFlatPod  SeatType = "full_flat_pod"
+	SeatTypePrivateSuite SeatType = "private_suite"
 )
+
+// PriceOffer adds card surcharges and airline credit penalties to the offer. Nil IntendedServices is sent as [].
+func (a *API) PriceOffer(ctx context.Context, offerID string, input PriceOfferInput, opts ...RequestOption) (*Offer, error) {
+	if err := validateID(offerID, offerIDPrefix); err != nil {
+		return nil, err
+	}
+	if input.IntendedServices == nil {
+		input.IntendedServices = []ServiceCreateInput{}
+	}
+	return newRequestWithAPI[PriceOfferInput, Offer](a).
+		Postf("/air/offers/%s/actions/price", offerID).
+		Body(&input).
+		WithOptions(opts...).Single(ctx)
+}
+
+// GetUpsellOffers returns the higher fare brands available for an offer.
+func (a *API) GetUpsellOffers(ctx context.Context, offerID string, opts ...RequestOption) ([]*Offer, error) {
+	if err := validateID(offerID, offerIDPrefix); err != nil {
+		return nil, err
+	}
+	return newRequestWithAPI[EmptyPayload, Offer](a).
+		Postf("/air/offers/%s/upsell_offers", offerID).
+		WithOptions(opts...).Slice(ctx)
+}
+
+func (m *IntendedPaymentMethod) ChargeAmount() currency.Amount {
+	return amountOrZero(m.RawChargeAmount, m.RawChargeCurrency)
+}
+
+// PenaltyAmount is set for airline credits only.
+func (m *IntendedPaymentMethod) PenaltyAmount() *currency.Amount {
+	return optionalAmount(m.RawPenaltyAmount, m.RawPenaltyCurrency)
+}
+
+// SurchargeAmount is set for cards only.
+func (m *IntendedPaymentMethod) SurchargeAmount() *currency.Amount {
+	return optionalAmount(m.RawSurchargeAmount, m.RawSurchargeCurrency)
+}
+
+func (t *TaxBreakdownItem) Amount() currency.Amount {
+	return amountOrZero(t.RawAmount, t.RawCurrency)
+}
+
+func amountOrZero(value, code string) currency.Amount {
+	amount, err := currency.NewAmount(value, code)
+	if err != nil {
+		return currency.Amount{}
+	}
+	return amount
+}
+
+func optionalAmount(value, code *string) *currency.Amount {
+	if value == nil || code == nil {
+		return nil
+	}
+	amount, err := currency.NewAmount(*value, *code)
+	if err != nil {
+		return nil
+	}
+	return &amount
+}
 
 // UpdateOfferPassenger updates a single offer passenger.
 func (a *API) UpdateOfferPassenger(

@@ -7,8 +7,10 @@ package duffel
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -152,6 +154,30 @@ func serveFixture(t *testing.T, status int, fixture string, headers map[string]s
 		w.WriteHeader(status)
 		_, _ = w.Write(body)
 	}
+}
+
+// recordedRequest is what newRecordingClient received, so tests can check the method, path, query and body sent.
+type recordedRequest struct {
+	Method string
+	Path   string
+	Query  url.Values
+	Body   string
+}
+
+// newRecordingClient records each request and serves the fixture, or an empty body when fixture is "".
+func newRecordingClient(t *testing.T, status int, fixture string) (Duffel, *recordedRequest) {
+	serve := func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(status) }
+	if fixture != "" {
+		serve = serveFixture(t, status, fixture, nil)
+	}
+	rec := new(recordedRequest)
+	return newTestClient(
+		t, func(w http.ResponseWriter, r *http.Request) {
+			sent, _ := io.ReadAll(r.Body)
+			*rec = recordedRequest{Method: r.Method, Path: r.URL.Path, Query: r.URL.Query(), Body: string(sent)}
+			serve(w, r)
+		},
+	), rec
 }
 
 func TestRateLimitRemainingZeroKeepsSuccessfulResponse(t *testing.T) {

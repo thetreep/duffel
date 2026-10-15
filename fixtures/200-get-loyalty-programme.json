@@ -1,0 +1,17 @@
+{
+  "data": {
+    "alliance": "SuperAlliance",
+    "id": "loy_00001876aqC8c5umZmrRds",
+    "logo_url": "https://assets.duffel.com/img/loyalty-programmes/full-color-logo/AA-AAdvantage.svg",
+    "name": "Mile Club",
+    "owner_airline": {
+      "conditions_of_carriage_url": "https://www.britishairways.com/en-gb/information/legal/british-airways/general-conditions-of-carriage",
+      "iata_code": "BA",
+      "id": "arl_00001876aqC8c5umZmrRds",
+      "logo_lockup_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-lockup/BA.svg",
+      "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/BA.svg",
+      "name": "British Airways"
+    },
+    "owner_airline_id": "arl_00001876aqC8c5umZmrRds"
+  }
+}

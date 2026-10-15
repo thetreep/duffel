@@ -50,11 +50,37 @@ type (
 		AvailableActions      []AvailableActionType `json:"available_actions,omitempty"`
 		IsPendingConfirmation bool                  `json:"-"`
 		IsAwaitingCreation    bool                  `json:"-"`
-		// TODO: Users // preview - slice of string ids representing users allowed to manage this order
+		// BookingReferences lists every carrier PNR on the order, including BookingReference.
+		BookingReferences []BookingReference `json:"booking_references,omitempty"`
+		// IntendedPaymentMethods is only set on unpaid hold orders.
+		IntendedPaymentMethods []IntendedPaymentMethod `json:"intended_payment_methods,omitempty"`
+		TaxBreakdown           []TaxBreakdownItem      `json:"tax_breakdown,omitempty"`
+		// Users are the IDs of the customer users allowed to manage the order.
+		Users []string `json:"users,omitempty"`
+		// VoidWindowEndsAt is set while a paid order can still be voided.
+		VoidWindowEndsAt *time.Time `json:"void_window_ends_at,omitempty"`
+	}
+
+	BookingReference struct {
+		BookingReference string   `json:"booking_reference"`
+		Carrier          *Airline `json:"carrier,omitempty"`
+	}
+
+	TravelAgentTicket struct {
+		ID               string `json:"id"`
+		ExternalTicketID string `json:"external_ticket_id"`
+	}
+
+	PriceOrderInput struct {
+		IntendedPaymentMethods []IntendedPaymentMethodInput `json:"intended_payment_methods"`
 	}
 
 	SliceConditions struct {
 		ChangeBeforeDeparture *ChangeCondition `json:"change_before_departure,omitempty"`
+		// The fields below are only returned on offers. Nil means unknown.
+		AdvanceSeatSelection *bool `json:"advance_seat_selection,omitempty"`
+		PriorityBoarding     *bool `json:"priority_boarding,omitempty"`
+		PriorityCheckIn      *bool `json:"priority_check_in,omitempty"`
 	}
 
 	Conditions struct {
@@ -104,6 +130,9 @@ type (
 		SelectedOffers []string `json:"selected_offers"`
 
 		Services []ServiceCreateInput `json:"services,omitempty"`
+
+		// Users are the IDs of the customer users allowed to manage the order.
+		Users []string `json:"users,omitempty"`
 	}
 
 	AddOrderServiceInput struct {
@@ -158,6 +187,8 @@ type (
 	OrderUpdateParams struct {
 		// Metadata replaces the order metadata. An empty non-nil map clears it, a nil map is sent as null.
 		Metadata map[string]any `json:"metadata"`
+		// Users replaces the customer users allowed to manage the order. Nil leaves them unchanged.
+		Users []string `json:"users,omitempty"`
 	}
 
 	ListOrdersParams struct {
@@ -239,8 +270,9 @@ type (
 		CreatedAt        time.Time             `json:"created_at"`
 		OrderID          string                `json:"order_id"`
 		Removed          []Slice               `json:"removed"`
-		// TODO: TravelAgentTicket // preview
-		UpdatedAt time.Time `json:"updated_at"`
+		// TravelAgentTicket is set when the change needs manual handling by Duffel.
+		TravelAgentTicket *TravelAgentTicket `json:"travel_agent_ticket,omitempty"`
+		UpdatedAt         time.Time          `json:"updated_at"`
 	}
 
 	ActionTakenType string
@@ -286,6 +318,9 @@ type (
 
 		// AcceptAirlineInitiatedChange Accept an airline-initiated change.
 		AcceptAirlineInitiatedChange(ctx context.Context, id string, opts ...RequestOption) (*Order, error)
+
+		// PriceOrder Price a hold order with the payment methods you intend to use.
+		PriceOrder(ctx context.Context, id string, input PriceOrderInput, opts ...RequestOption) (*Order, error)
 
 		// ListAirlineInitiatedChanges List airline-initiated changes.
 		ListAirlineInitiatedChanges(
@@ -378,6 +413,17 @@ func (a *API) AddOrderService(
 		WithOptions(opts...).Single(ctx)
 }
 
+// PriceOrder prices an unpaid hold order for the payment methods you intend to use.
+func (a *API) PriceOrder(ctx context.Context, id string, input PriceOrderInput, opts ...RequestOption) (*Order, error) {
+	if err := validateID(id, orderIDPrefix); err != nil {
+		return nil, err
+	}
+	return newRequestWithAPI[PriceOrderInput, Order](a).
+		Postf("/air/orders/%s/actions/price", id).
+		Body(&input).
+		WithOptions(opts...).Single(ctx)
+}
+
 // UpdateAirlineInitiatedChange updates an airline-initiated change.
 func (a *API) UpdateAirlineInitiatedChange(
 	ctx context.Context, id string, input UpdateAirlineInitiatedChangeInput,
@@ -405,25 +451,11 @@ func (a *API) ListAirlineInitiatedChanges(
 }
 
 func (o *Order) BaseAmount() *currency.Amount {
-	if o.RawBaseAmount != nil && o.RawBaseCurrency != nil {
-		amount, err := currency.NewAmount(*o.RawBaseAmount, *o.RawBaseCurrency)
-		if err != nil {
-			return nil
-		}
-		return &amount
-	}
-	return nil
+	return optionalAmount(o.RawBaseAmount, o.RawBaseCurrency)
 }
 
 func (o *Order) TaxAmount() *currency.Amount {
-	if o.RawTaxAmount != nil && o.RawTaxCurrency != nil {
-		amount, err := currency.NewAmount(*o.RawTaxAmount, *o.RawTaxCurrency)
-		if err != nil {
-			return nil
-		}
-		return &amount
-	}
-	return nil
+	return optionalAmount(o.RawTaxAmount, o.RawTaxCurrency)
 }
 
 func (o *Order) TotalAmount() currency.Amount {
@@ -435,15 +467,7 @@ func (o *Order) TotalAmount() currency.Amount {
 }
 
 func (c *ChangeCondition) PenaltyAmount() *currency.Amount {
-	if c.RawPenaltyAmount != nil && c.RawPenaltyCurrency != nil {
-		amount, err := currency.NewAmount(*c.RawPenaltyAmount, *c.RawPenaltyCurrency)
-		if err != nil {
-			return nil
-		}
-		return &amount
-	}
-
-	return nil
+	return optionalAmount(c.RawPenaltyAmount, c.RawPenaltyCurrency)
 }
 
 func (s *Service) TotalAmount() currency.Amount {

@@ -170,19 +170,28 @@ func (a *API) CreatePendingOrderChange(ctx context.Context, offerID string, opts
 		WithOptions(opts...).Single(ctx)
 }
 
-// ConfirmOrderChange confirms a pending order change.
+// ConfirmOrderChange confirms a pending order change (oce_ ID). A zero payment is omitted, for changes with
+// nothing to pay. Only arc_bsp_cash, balance and card are accepted.
 func (a *API) ConfirmOrderChange(
-	ctx context.Context, orderChangeRequestID string, payment PaymentCreateInput,
+	ctx context.Context, orderChangeID string, payment PaymentCreateInput,
 	opts ...RequestOption,
 ) (*OrderChange, error) {
-	if err := validateID(orderChangeRequestID, orderChangeRequestIDPrefix); err != nil {
+	if err := validateID(orderChangeID, orderChangeIDPrefix); err != nil {
 		return nil, err
 	}
 
-	return newRequestWithAPI[PaymentCreateInput, OrderChange](a).
-		Postf("/air/order_changes/%s/actions/confirm", orderChangeRequestID).
-		Body(&payment).
+	body := confirmOrderChangeBody{}
+	if payment != (PaymentCreateInput{}) {
+		body.Payment = &payment
+	}
+	return newRequestWithAPI[confirmOrderChangeBody, OrderChange](a).
+		Postf("/air/order_changes/%s/actions/confirm", orderChangeID).
+		Body(&body).
 		WithOptions(opts...).Single(ctx)
+}
+
+type confirmOrderChangeBody struct {
+	Payment *PaymentCreateInput `json:"payment,omitempty"`
 }
 
 // GetOrderChange retrieves an order change by its ID.

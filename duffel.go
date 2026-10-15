@@ -29,6 +29,9 @@ type (
 		PlacesClient
 		PaymentCardClient
 		LoyaltyProgrammeClient
+		AirlineCreditClient
+		WebhookClient
+		CustomerUserClient
 
 		// LastRequestID returns the x-request-id of the latest response. Under concurrent use it may belong
 		// to another call: prefer RequestIDFromError or List.LastRequestID for a value tied to one call.
@@ -64,6 +67,10 @@ type (
 		Duration      Duration        `json:"duration,omitempty"`
 		Segments      []Flight        `json:"segments,omitempty"`
 		FareBrandName string          `json:"fare_brand_name,omitempty"`
+		// ComparisonKey is shared by identical slices across offers, for grouping.
+		ComparisonKey string `json:"comparison_key,omitempty"`
+		// NGSShelf is the NGS shelf from 1 (basic) to 5 (premium), nil when unknown.
+		NGSShelf *int `json:"ngs_shelf,omitempty"`
 	}
 
 	Flight struct {
@@ -101,6 +108,8 @@ type (
 		CabinClass              CabinClass `json:"cabin_class"`
 		Baggages                []Baggage  `json:"baggages"`
 		Seat                    Seat       `json:"seat"`
+		// Cabin is only returned on offers.
+		Cabin *SegmentCabin `json:"cabin,omitempty"`
 	}
 
 	Seat struct {
@@ -131,6 +140,7 @@ type (
 		CityName        string  `json:"city_name" `
 		IATACode        string  `json:"iata_code" `
 		IATACountryCode string  `json:"iata_country_code" `
+		IATACityCode    string  `json:"iata_city_code,omitempty"`
 		ICAOCode        string  `json:"icao_code" `
 		Latitude        float32 `json:"latitude" `
 		Longitude       float32 `json:"longitude" `
@@ -188,6 +198,8 @@ type (
 		LoyaltyProgrammeAccounts []LoyaltyProgrammeAccount `json:"loyalty_programme_accounts,omitempty"`
 		// (Required) The passenger's phone number in E.164 (international) format
 		PhoneNumber string `json:"phone_number"`
+		// UserID links the passenger to a customer user, on CreateOrder only.
+		UserID string `json:"user_id,omitempty"`
 		// Type is the type of passenger.
 		// Possible values: "adult", "child", or "infant_without_seat"
 		Type PassengerType `json:"type"`
@@ -211,7 +223,8 @@ type (
 		Type PaymentMethod `json:"type"`
 
 		// Unique identifier of a lodged card by Duffel.
-		CardID string `json:"card_id,omitempty"`
+		CardID                string `json:"card_id,omitempty"`
+		ThreeDSecureSessionID string `json:"three_d_secure_session_id,omitempty"`
 	}
 
 	// The payment status for an order.
@@ -317,6 +330,7 @@ const (
 	PassengerTitleMs   PassengerTitle = "ms"
 	PassengerTitleMrs  PassengerTitle = "mrs"
 	PassengerTitleMiss PassengerTitle = "miss"
+	PassengerTitleDr   PassengerTitle = "dr"
 
 	PaymentMethodBalance               PaymentMethod = "balance"
 	PaymentMethodARCBSPCash            PaymentMethod = "arc_bsp_cash"

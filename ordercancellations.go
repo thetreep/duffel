@@ -31,15 +31,36 @@ type (
 		AirlineCredits    []AirlineCredit `json:"airline_credits"`
 	}
 
+	// AirlineCredit is a credit quote on a pending cancellation, or an issued credit elsewhere.
+	// The credit_* fields are the older names of amount, amount_currency and code.
 	AirlineCredit struct {
-		RawCreditAmount   string `json:"credit_amount"`
-		RawCreditCurrency string `json:"credit_currency"`
-		CreditCode        string `json:"credit_code"`
-		CreditName        string `json:"credit_name"`
-		ID                string `json:"id"`
-		IssuedOn          Date   `json:"issued_on"`
-		PassengerID       string `json:"passenger_id"`
+		RawCreditAmount   string            `json:"credit_amount"`
+		RawCreditCurrency string            `json:"credit_currency"`
+		CreditCode        string            `json:"credit_code"`
+		CreditName        string            `json:"credit_name"`
+		ID                string            `json:"id"`
+		IssuedOn          Date              `json:"issued_on"`
+		PassengerID       string            `json:"passenger_id"`
+		Type              AirlineCreditType `json:"type,omitempty"`
+		RawAmount         string            `json:"amount,omitempty"`
+		RawAmountCurrency string            `json:"amount_currency,omitempty"`
+		Code              string            `json:"code,omitempty"`
+		// The fields below are only set on issued credits.
+		AirlineIATACode    string     `json:"airline_iata_code,omitempty"`
+		GivenName          string     `json:"given_name,omitempty"`
+		FamilyName         string     `json:"family_name,omitempty"`
+		UserID             string     `json:"user_id,omitempty"`
+		OrderID            string     `json:"order_id,omitempty"`
+		RawPenaltyAmount   *string    `json:"penalty_amount,omitempty"`
+		RawPenaltyCurrency *string    `json:"penalty_currency,omitempty"`
+		LiveMode           bool       `json:"live_mode,omitempty"`
+		CreatedAt          *time.Time `json:"created_at,omitempty"`
+		ExpiresAt          *time.Time `json:"expires_at,omitempty"`
+		SpentAt            *time.Time `json:"spent_at,omitempty"`
+		InvalidatedAt      *time.Time `json:"invalidated_at,omitempty"`
 	}
+
+	AirlineCreditType string
 
 	// OrderCancellationRequest is response from the OrderCancellation API.
 	//

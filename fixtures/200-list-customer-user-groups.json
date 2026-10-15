@@ -1,0 +1,16 @@
+{
+  "data": [
+    {
+      "id": "usg_0000AgZitpOnQtd3NQxjwO",
+      "name": "Northwind Solutions",
+      "user_ids": [
+        "icu_0000AgZitpOnQtd3NQxjwX"
+      ]
+    }
+  ],
+  "meta": {
+    "after": null,
+    "before": null,
+    "limit": 50
+  }
+}

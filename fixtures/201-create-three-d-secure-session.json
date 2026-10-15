@@ -1,0 +1,10 @@
+{
+  "data": {
+    "card_id": "tcd_0000AWr2XsTRIF1Vp34gh5",
+    "client_id": "tds_visa_5a9a7b0a574c",
+    "id": "3ds_0000AWr2XsTRIF1Vp34gh5",
+    "live_mode": true,
+    "resource_id": "off_0000AKTurT99qsmGTujhis",
+    "status": "ready_for_payment"
+  }
+}

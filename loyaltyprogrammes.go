@@ -6,11 +6,13 @@ import (
 
 type (
 	LoyaltyProgramme struct {
-		Alliance       string `json:"alliance"`
-		ID             string `json:"id"`
-		Name           string `json:"name"`
-		LogoURL        string `json:"logo_url"`
-		OwnerAirlineID string `json:"owner_airline_id"`
+		Alliance string `json:"alliance"`
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		LogoURL  string `json:"logo_url"`
+		// OwnerAirlineID is deprecated by Duffel in favour of OwnerAirline.
+		OwnerAirlineID string   `json:"owner_airline_id"`
+		OwnerAirline   *Airline `json:"owner_airline,omitempty"`
 	}
 
 	LoyaltyProgrammeClient interface {
